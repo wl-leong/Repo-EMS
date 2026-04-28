@@ -1,0 +1,27 @@
+# VS Code
+.vscode/
+
+# Workspace files
+*.code-workspace
+
+# SQL project build output
+bin/
+obj/
+
+# SQL publish / deployment artifacts
+*.dacpac
+*.deployreport
+*.deployscript
+*.publish.xml
+*.sqlcmdvars
+
+# User-specific files
+*.user
+*.suo
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
