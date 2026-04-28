@@ -1,0 +1,6 @@
+CREATE SCHEMA [mkt]
+    AUTHORIZATION [dbo];
+
+
+GO
+
