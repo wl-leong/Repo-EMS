@@ -2,18 +2,19 @@
 -- Author:		ZY Wong
 -- Create date: 2026-08-14
 -- Description: Select list of work order with item details within selected work order date range for specified customer
--- Used By:		EMS -> Report Module -> Operation -> Work Order -> Work Order Listing
+-- Used By:	    EMS -> Report Module -> Operation -> Work Order -> Work Order Listing
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
 -- 2026-08-14	1.0			ZY Wong 	Initial version
 -- ==========================================================================================
--- EXEC [SSP_WorkOrder_SSRS_SelectWorkOrderListing] 4, '2025-01-01', '2025-10-01', '29, 19, 37, 6'
+-- EXEC [SSP_WorkOrder_SSRS_SelectWorkOrderListing] 4, '2025-01-01', '2025-10-01', '29, 19, 37, 6', '5231,5236'
 CREATE PROCEDURE [dbo].[SSP_WorkOrder_SSRS_SelectWorkOrderListing]
-@companyId INT,
+@companyId INT = 4,
 @workOrderStartDate DATE,
 @workOrderEndDate DATE,
-@customerId VARCHAR(MAX)
+@customerId VARCHAR(MAX),
+@workOrderStatus VARCHAR(MAX)
 AS 
 BEGIN
 SET NOCOUNT ON;
@@ -26,6 +27,12 @@ SET XACT_ABORT ON;
 		SELECT [value] as customerId
 		INTO #customerList
 		FROM STRING_SPLIT(@customerId, ',')
+
+		DROP TABLE IF EXISTS #woStatusList;
+
+		SELECT [value] as workOrderStatus
+		INTO #woStatusList
+		FROM STRING_SPLIT(@workOrderStatus, ',')
 		
 		DROP TABLE IF EXISTS #woList;
 
@@ -34,6 +41,8 @@ SET XACT_ABORT ON;
 		FROM workOrderHeader wo
 			INNER JOIN #customerList cs
 				ON wo.customerId = cs.customerId
+			INNER JOIN #woStatusList l
+				ON wo.workOrderStatus = l.workOrderStatus
 		WHERE companyId = @companyId
 			AND workOrderDate BETWEEN @workOrderStartDate AND @workOrderEndDate
 
@@ -111,12 +120,38 @@ SET XACT_ABORT ON;
 		WHERE #woItems.workOrderItemStatusId = ct.categoryId 
 			--AND ct.[status] = 1
 
+		DROP TABLE IF EXISTS #poItems;
+
+		SELECT soli.soLineItemId, poli.poDetailsId, poli.invId
+		INTO #poItems
+		FROM poLineItem poli
+			INNER JOIN soLineItem soli
+				ON poli.poDetailsId = soli.ref_poLineItemId
+			INNER JOIN #woItems li
+				ON soli.soLineItemId = li.soLineItemId
+
+		ALTER TABLE #poItems ADD packaging VARCHAR(255);
+
+		UPDATE #poItems SET
+			packaging = att.[value]
+		FROM inventory_attributes att
+		WHERE #poItems.invId = att.invId
+			AND att.categoryId = 1123 -- packaging
+
+		ALTER TABLE #woItems ADD packaging VARCHAR(255);
+
+		UPDATE #woItems SET
+			packaging = li.packaging
+		FROM #poItems li
+		WHERE #woItems.soLineItemId = li.soLineItemId
+
 		SELECT wo.workOrderName, wo.workOrderDate, wo.cargoReadyDate, wo.deliveryDate, wo.targetCompleteDate, wo.customerName, wo.warehouse, wo.workOrderStatus,
-			li.soName, li.customerPo, li.POD, li.thirdPartyPo, li.modelNo, li.customerSku, li.EAN, li.customerModelNo, li.merchantSku, li.itemDesc, color, confirmQty, workOrderItemStatus
+			li.soName, li.customerPo, li.POD, li.thirdPartyPo, li.modelNo, li.customerSku, li.EAN, li.customerModelNo, li.merchantSku, li.itemDesc, li.color, li.packaging, li.confirmQty, li.workOrderItemStatus
 		FROM #woList wo
 			INNER JOIN #woItems li
 				ON wo.workOrderHeaderId = li.workOrderHeaderId
 		ORDER BY wo.workOrderDate, wo.workOrderName, li.soName, li.modelNo
+		
 END
 
 GO
