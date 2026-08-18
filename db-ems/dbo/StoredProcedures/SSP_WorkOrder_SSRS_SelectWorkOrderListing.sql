@@ -6,31 +6,26 @@
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-08-18	1.1			ZY Wong		Remove parameter @customerId, allow @workOrderStartDate and @workOrderEndDate pass in null
 -- 2026-08-14	1.0			ZY Wong 	Initial version
 -- ==========================================================================================
--- EXEC [SSP_WorkOrder_SSRS_SelectWorkOrderListing] 4, '2025-01-01', '2025-10-01', '29, 19, 37, 6', '5231,5236'
+-- EXEC [SSP_WorkOrder_SSRS_SelectWorkOrderListing] 4, '5231,5236', '2025-03-01', '2025-03-31'
+-- EXEC [SSP_WorkOrder_SSRS_SelectWorkOrderListing] 4, '5230', '2025-06-01', '2025-08-31'
 CREATE PROCEDURE [dbo].[SSP_WorkOrder_SSRS_SelectWorkOrderListing]
 @companyId INT = 4,
-@workOrderStartDate DATE,
-@workOrderEndDate DATE,
-@customerId VARCHAR(MAX),
-@workOrderStatus VARCHAR(MAX)
+@workOrderStatus VARCHAR(MAX),
+@workOrderStartDate DATE = NULL,
+@workOrderEndDate DATE = NULL
 AS 
 BEGIN
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
-		-- DECLARE @companyId INT = 4, @workOrderStartDate DATE = '2025-01-01', @workOrderEndDate DATE = '2025-10-01', @customerId VARCHAR(MAX) = '29, 19, 37, 6';
-
-		DROP TABLE IF EXISTS #customerList;
-
-		SELECT [value] as customerId
-		INTO #customerList
-		FROM STRING_SPLIT(@customerId, ',')
+		-- DECLARE @companyId INT = 4, @workOrderStatus VARCHAR(MAX) = '5230', @workOrderStartDate DATE = '2025-01-01', @workOrderEndDate DATE = '2025-10-01';
 
 		DROP TABLE IF EXISTS #woStatusList;
 
-		SELECT [value] as workOrderStatus
+		SELECT CONVERT(INT, [value]) as workOrderStatus
 		INTO #woStatusList
 		FROM STRING_SPLIT(@workOrderStatus, ',')
 		
@@ -39,12 +34,12 @@ SET XACT_ABORT ON;
 		SELECT wo.workOrderHeaderId, wo.workOrderName, wo.workOrderDate, DATEADD(DAY, -8, shipDate) as cargoReadyDate, wo.shipDate as deliveryDate, wo.targetCompleteDate, wo.workOrderStatus as workOrderStatusId, wo.customerId, wo.warehouseId
 		INTO #woList
 		FROM workOrderHeader wo
-			INNER JOIN #customerList cs
-				ON wo.customerId = cs.customerId
 			INNER JOIN #woStatusList l
 				ON wo.workOrderStatus = l.workOrderStatus
 		WHERE companyId = @companyId
-			AND workOrderDate BETWEEN @workOrderStartDate AND @workOrderEndDate
+			AND ((@workOrderStartDate IS NULL AND @workOrderEndDate IS NULL)
+				OR (@workOrderStartDate IS NOT NULL AND @workOrderEndDate IS NOT NULL 
+					AND workOrderDate BETWEEN @workOrderStartDate AND @workOrderEndDate))
 
 		ALTER TABLE #woList ADD customerName VARCHAR(100);
 		ALTER TABLE #woList ADD workOrderStatus VARCHAR(50);
@@ -151,7 +146,7 @@ SET XACT_ABORT ON;
 			INNER JOIN #woItems li
 				ON wo.workOrderHeaderId = li.workOrderHeaderId
 		ORDER BY wo.workOrderDate, wo.workOrderName, li.soName, li.modelNo
-		
+
 END
 
 GO
