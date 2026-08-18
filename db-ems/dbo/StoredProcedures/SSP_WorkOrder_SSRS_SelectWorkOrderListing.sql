@@ -36,10 +36,9 @@ SET XACT_ABORT ON;
 		FROM workOrderHeader wo
 			INNER JOIN #woStatusList l
 				ON wo.workOrderStatus = l.workOrderStatus
-		WHERE companyId = @companyId
-			AND ((@workOrderStartDate IS NULL AND @workOrderEndDate IS NULL)
-				OR (@workOrderStartDate IS NOT NULL AND @workOrderEndDate IS NOT NULL 
-					AND workOrderDate BETWEEN @workOrderStartDate AND @workOrderEndDate))
+		WHERE wo.companyId = @companyId
+			AND (@workOrderStartDate IS NULL OR wo.workOrderDate >= @workOrderStartDate)
+			AND (@workOrderEndDate IS NULL OR wo.workOrderDate <= @workOrderEndDate)
 
 		ALTER TABLE #woList ADD customerName VARCHAR(100);
 		ALTER TABLE #woList ADD workOrderStatus VARCHAR(50);
