@@ -7,6 +7,7 @@
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-09-04	4.0			ZY Wong		Remove carton material & qtyPerCarton, improve validation
 -- 2025-08-26   3.0         Zy Wong     Add carton material & qtyPerCarton
 -- 2024-11-09	2.0			WL Leong	Remove validaion on duplicate check in the for update, Add tagDivision
 -- 2024-05-09	1.0			ZY Wong		Initial version
@@ -33,16 +34,9 @@ set @Json = N'{
 	}
 }'
 
- EXEC [SSP_CustomerSku_UpsertInfo] @Json, @userId
-set @Json = N'{"customerSkuList":[{"companyId":"11","customerId":"26","customerSkuId":36,"invId":"1","customerSku":"BH61100005302WH","merchantSku":"662606518","EAN":"9551020200006",
-                "itemDesc":"","currencyCode":"1121","csCost":"49.2900","feedStartDate":"2024-05-09","feedingEndDate":"2024-05-09","action":"Update"}]}'
-
-
---set @Json = N'{"customerSkuList":[{"companyId":"11","customerId":"26","customerSkuId":"36","invId":null,"customerSku":null,"merchantSku":null,"EAN":null,
---                "itemDesc":null,"currencyCode":null,"csCost":null,"feedStartDate":null,"feedingEndDate":null,"action":"Delete"}]}'
 EXEC [SSP_CustomerSku_UpsertInfo] @Json, @userId
-select * from md_customersku where companyid = 11	and customerSku = 'BH61100005302WH' and customerid = 26
 */
+
 
 CREATE PROCEDURE [dbo].[SSP_CustomerSku_UpsertInfo]
 @Json NVARCHAR(MAX),
@@ -61,9 +55,9 @@ SET XACT_ABORT ON
 
 		DROP TABLE IF EXISTS #skuList;
 
-		SELECT companyId, customerId, ISNULL(customerSkuId,0) as customerSkuId, invId, customerSku, merchantSku, ISNULL(EAN,'') as EAN, ISNULL(itemDesc,'') as itemDesc, 
-            currencyCode, CASE WHEN ISNULL(csCost,'') = '' THEN '0.0000' ELSE CAST(csCost AS NUMERIC(18,4)) END as csCost, feedStartDate, feedingEndDate, actionType, 
-            tagDivision, cartonMaterial, qtyPerCarton
+		SELECT companyId, customerId, customerSkuId, invId, customerSku, merchantSku, ISNULL(EAN,'') as EAN, ISNULL(itemDesc,'') as itemDesc, 
+            currencyCode, CASE WHEN ISNULL(csCost,'') = '' THEN '0.0000' ELSE CAST(csCost AS NUMERIC(18,4)) END as csCost, tagDivision, 
+			CAST(feedStartDate as DATE) as feedStartDate, CAST(feedingEndDate as DATE) as feedingEndDate, actionType            
 		INTO #skuList
 		FROM  OPENJSON(@Json, '$.customerSkuList') 
    			WITH (
@@ -77,136 +71,191 @@ SET XACT_ABORT ON
                 itemDesc VARCHAR(5000)          N'$.itemDesc',
 				currencyCode VARCHAR(30)		N'$.currencyCode',
 				csCost VARCHAR(20)				N'$.csCost',
+				tagDivision INT		            N'$.division',
 				feedStartDate VARCHAR(10)		N'$.feedStartDate',
-				feedingEndDate VARCHAR(10)		N'$.feedingEndDate',
-                tagDivision INT		            N'$.division',
-                cartonMaterial BIGINT           N'$.cartonMaterial',
-                qtyPerCarton INT                N'$.qtyPerCarton',
+				feedingEndDate VARCHAR(10)		N'$.feedingEndDate',              
 				actionType VARCHAR(10)			N'$.action'
 			)
 
-		DECLARE @actionType VARCHAR(50);
+		DECLARE @companyId INT, @customerId INT, @customerSkuId BIGINT, @invId BIGINT, @customerSku VARCHAR(30), @merchantSku VARCHAR(30), @EAN VARCHAR(30), @itemDesc VARCHAR(5000),
+			@currencyCode VARCHAR(30), @csCost VARCHAR(20), @tagDivision INT, @feedStartDate DATE, @feedingEndDate DATE, @actionType VARCHAR(50);
 
-		SELECT @actionType = actionType
+		SELECT @companyId = companyId, @customerId = customerId, @customerSkuId = customerSkuId, @invId = invId, @customerSku = customerSku, @merchantSku = merchantSku, @EAN = EAN, @itemDesc = itemDesc,
+			@currencyCode = currencyCode, @csCost = csCost, @tagDivision = tagDivision, @feedStartDate = feedStartDate, @feedingEndDate = feedingEndDate, @actionType = actionType
 		FROM #skuList
 
+		-- check missing actionType
         IF @actionType IS NULL
         BEGIN
-            SET @ErrMessage = 'Action Type is required.';
+            SET @ErrMessage = '[System Error] Action Type is required.';
 			THROW 60000, @ErrMessage, 1;
         END
 
+		-- check missing companyId
+		IF @companyId IS NULL
+		BEGIN
+			SET @ErrMessage = '[System Error] Company ID is required.';
+			THROW 60000, @ErrMessage, 1;
+		END
+
+		-- check missing customerId
+		IF @customerId IS NULL
+		BEGIN
+			SET @ErrMessage = '[System Error] Customer ID is required.';
+			THROW 60000, @ErrMessage, 1;
+		END
+
+		-- check missing customerSku
+        IF @customerSku IS NULL
+        BEGIN
+            SET @ErrMessage = 'Customer Sku is compulsory. Please enter Customer Sku.';
+			THROW 60000, @ErrMessage, 1;
+        END
+
+		-- check missing merchantSku
+        IF @merchantSku IS NULL
+        BEGIN
+            SET @ErrMessage = 'Merchant Sku is compulsory. Please enter Merchant Sku.';
+			THROW 60000, @ErrMessage, 1;
+        END
+
+		IF @actionType = 'Add'
+		BEGIN
+			-- combination (companyId + customerId + customerSku + merchantSku) = unique
+			-- check unqiue combination duplicates
+            IF EXISTS (
+				SELECT 1 FROM md_CustomerSku
+				WHERE companyId = @companyId
+					AND customerId = @customerId
+					AND customerSku = @customerSku
+					AND merchantSku = @merchantSku
+					AND statusflag = 1
+			)
+            BEGIN
+                SET @ErrMessage = 'Customer Sku ' + @customerSku + ' (Merchant Sku '+ @merchantSku +') already exists in the system. Please enter a valid Customer Sku/ Merchant Sku.';
+                THROW 60000, @ErrMessage, 1;
+            END
+		END
+
         IF @actionType IN ('Add', 'Update')
         BEGIN
-            IF (SELECT COUNT(1) FROM #skuList WHERE ISNULL(customerSku,'') = '') > 0
+			-- check missing invId
+			IF @invId IS NULL
+			BEGIN
+				SET @ErrMessage = '[System Error] Inv ID is required.';
+				THROW 60000, @ErrMessage, 1;
+			END
+
+			-- update empty itemDesc
+			IF ISNULL(@itemDesc,'') = ''
+			BEGIN
+				SET @itemDesc = (SELECT CASE WHEN ISNULL(itemDesc,'') = '' THEN productName ELSE itemDesc END
+									FROM md_Inventory 
+									WHERE companyId = @companyId
+										AND invId = @invId
+										AND [status] = 1);
+			END
+
+			-- check missing currency
+			IF @currencyCode IS NULL
             BEGIN
-                SET @ErrMessage = 'Customer Sku is compulsory.';
+                SET @ErrMessage = 'Currency Code is compulsory. Please enter Currency Code.';
 			    THROW 60000, @ErrMessage, 1;
             END
 
-            IF (SELECT COUNT(1) FROM #skuList WHERE ISNULL(merchantSku,'') = '') > 0
+			-- check missing tagDivision
+			IF @tagDivision IS NULL
             BEGIN
-                SET @ErrMessage = 'Merchant Sku is compulsory.';
+                SET @ErrMessage = 'Tag Division is compulsory. Please enter Tag Division.';
 			    THROW 60000, @ErrMessage, 1;
-            END
-
-            -- combination (companyId + customerId + customerSku + merchantSku) = unique
-            DROP TABLE IF EXISTS #checkSkuCombinationExists;
-
-            SELECT sku.customerSkuId, l.customerSkuId as oriCustomerSkuId, l.customerSku, l.merchantSku
-            INTO #checkSkuCombinationExists
-            FROM #skuList l
-                INNER JOIN md_CustomerSku sku
-                    ON l.companyId = sku.companyId
-                    AND l.customerId = sku.customerId
-                    AND l.customerSku = sku.customerSku
-                    AND l.merchantSku = sku.merchantSku
-                    AND sku.statusflag = 1
-
-            IF (SELECT COUNT(1) FROM #checkSkuCombinationExists WHERE customerSkuId IS NOT NULL AND customerSkuId <> oriCustomerSkuId) > 0
-            BEGIN
-                SET @ErrMessage = (SELECT 'Customer Sku ' + STRING_AGG(CONVERT(VARCHAR(MAX), customerSku + ' (Merchant Sku '+ merchantSku +')'), ', ')  + ' already exists in the system.' 
-                                    FROM (SELECT DISTINCT customerSku, merchantSku 
-                                            FROM #checkSkuCombinationExists
-                                            WHERE customerSkuId IS NOT NULL
-                                                AND customerSkuId <> oriCustomerSkuId)g 
-                                    );
-                THROW 60000, @ErrMessage, 1;
-            END
-
-            IF (SELECT COUNT(1) FROM #skuList WHERE ISNULL(cartonMaterial,0) <> 0 AND ISNULL(qtyPerCarton,0) <= 0) > 0
-            BEGIN
-                SET @ErrMessage = (SELECT 'Qty Per Carton is needed for Carton Material ' + STRING_AGG(CONVERT(VARCHAR(MAX), inventorySku), ', ') + '.'
-                                    FROM (SELECT inventorySku FROM md_Inventory where invId IN 
-                                            (SELECT DISTINCT cartonMaterial 
-                                                FROM #skuList
-                                                WHERE ISNULL(cartonMaterial,0) <> 0 
-                                                    AND ISNULL(qtyPerCarton,0) <= 0)
-                                          )g
-                                    );
-                THROW 60000, @ErrMessage, 1;
             END
         END
 
-        UPDATE l SET 
-            itemDesc = CASE WHEN l.itemDesc = '' THEN ( CASE WHEN ISNULL(inv.itemDesc,'') = '' THEN inv.productName ELSE inv.itemDesc END) ELSE l.itemDesc END
-        FROM #skuList l
-            INNER JOIN md_Inventory inv 
-                ON l.companyId = inv.companyId
-                AND l.invId = inv.invId
-                AND inv.[status] = 1
+		IF @actionType IN ('Update', 'Delete')
+		BEGIN
+			-- check missing customerSkuId
+			IF @customerSkuId IS NULL
+			BEGIN
+				SET @ErrMessage = '[System Error] Customer Sku ID is required.';
+				THROW 60000, @ErrMessage, 1;
+			END
+
+			-- check invalid customerSkuId
+			IF NOT EXISTS (
+				SELECT 1 FROM md_CustomerSku
+				WHERE customerSkuId = @customerSkuId
+			)
+			BEGIN
+				SET @ErrMessage = '[System Error] Customer Sku ID ' + CAST(@customerSkuId as VARCHAR) + ' not found in the system.';
+				THROW 60000, @ErrMessage, 1;
+			END 
+		END
+
+		IF @actionType = 'Update'
+		BEGIN
+			-- check unqiue combination duplicates to update
+			-- exclude existing customerSkuId
+			IF EXISTS (
+				SELECT 1 FROM md_CustomerSku
+				WHERE companyId = @companyId
+					AND customerId = @customerId
+					AND customerSku = @customerSku
+					AND merchantSku = @merchantSku
+					AND statusflag = 1
+					AND customerSkuId <> @customerSkuId
+			)
+            BEGIN
+                SET @ErrMessage = 'Customer Sku ' + @customerSku + ' (Merchant Sku '+ @merchantSku +') already exists in the system. Please enter a valid Customer Sku/ Merchant Sku.';
+                THROW 60000, @ErrMessage, 1;
+            END
+		END
+
+		
 
         BEGIN TRANSACTION
 
             IF @actionType = 'Delete'
             BEGIN
-                UPDATE sku SET
+                UPDATE md_CustomerSku SET
                     statusFlag = 0,
                     updateBy = @userId,
-                    updateDateTime = getdate()
-                FROM md_CustomerSku sku
-                    INNER JOIN #skuList l
-                        ON sku.customerskuId = l.customerSkuId
+                    updateDateTime = GETDATE()
+                WHERE customerSkuId = @customerSkuId
 
                 SET @ErrMessage = 'deleted.'
             END
 
             IF @actionType = 'Update'
             BEGIN
-                UPDATE sku SET 
-                    customerSku = l.customerSku,
-                    merchantSku = l.merchantSku,
-                    EAN = l.EAN,
-                    itemDesc = l.itemDesc,
-                    csCost = l.csCost,
-                    feedStartDate = l.feedStartDate,
-                    feedingEndDate = l.feedingEndDate,
-                    tagDivision = l.tagDivision,
-                    cartonMaterial = l.cartonMaterial,
-                    qtyPerCarton = l.qtyPerCarton,
+                UPDATE md_CustomerSku SET 
+                    customerSku = @customerSku,
+                    merchantSku = @merchantSku,
+                    EAN = @EAN,
+                    itemDesc = @itemDesc,
+                    csCost = @csCost,
+                    feedStartDate = ISNULL(@feedStartDate, feedStartDate),
+                    feedingEndDate = ISNULL(@feedingEndDate, feedingEndDate),
+                    tagDivision = @tagDivision,
                     updateBy = @userId,
-                    updateDateTime = getdate()
-                FROM md_CustomerSku sku
-                    INNER JOIN #skuList l
-                        ON sku.customerskuId = l.customerSkuId
+                    updateDateTime = GETDATE()
+                WHERE customerSkuId = @customerSkuId
  
                 SET @ErrMessage = 'updated.'
             END
 
             IF @actionType = 'Add'
             BEGIN
-                INSERT INTO md_CustomerSku (customerId, companyId, invId, customerSku, merchantSku, EAN, itemDesc, currencyCode, csCost, statusFlag, tagDivision, cartonMaterial, qtyPerCarton,
+                INSERT INTO md_CustomerSku (customerId, companyId, invId, customerSku, merchantSku, EAN, itemDesc, currencyCode, csCost, statusFlag, tagDivision, 
                     feedStartDate, feedingEndDate, enterBy, createDateTime, updateBy, updateDateTime)
-                SELECT customerId, companyId, invId, customerSku, merchantSku, EAN, itemDesc, currencyCode, csCost, 1 as statusFlag, tagDivision, cartonMaterial, qtyPerCarton,
-                    feedStartDate, feedingEndDate, @userId, getdate(), @userId, getdate()
-                FROM #skuList
+                SELECT @customerId, @companyId, @invId, @customerSku, @merchantSku, @EAN, @itemDesc, @currencyCode, @csCost, 1 as statusFlag, @tagDivision, 
+                    ISNULL(@feedStartDate, GETDATE()), ISNULL(@feedingEndDate, GETDATE()), @userId, GETDATE(), @userId, GETDATE()
 
                 SET @ErrMessage = 'added.'
             END
 
         COMMIT TRANSACTION
 
-        SET @ErrMessage = 'Customer SKU is successfully ' + @ErrMessage;
+        SET @ErrMessage = 'Customer Sku is successfully ' + @ErrMessage;
 
 		SELECT '_SUCCESS_' as status, @ErrMessage as returnMessage
 
@@ -230,4 +279,3 @@ SET XACT_ABORT ON
 END
 
 GO
-
