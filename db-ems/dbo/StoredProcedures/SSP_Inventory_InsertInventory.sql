@@ -2,11 +2,12 @@
 -- Author:		ZY Wong
 -- Create date: 2023-11-21
 -- Description:	Load inventory list from dump 
--- Used By:		Inventory Module > Import Inventory
---              Inventory Module > Inventory Listing > Add
+-- Used By:		(MKT)Inventory Module > Import Inventory
+--              (MKT)Inventory Module > Inventory Listing > Add
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-09-21	11.0		ZY Wong		Remove packaging from input
 -- 2025-01-14   10.0        ZY Wong     Add validation check warehouse exists
 -- 2024-10-21   9.0         ZY Wong     Change use OR for ignore empty line, change 'color' to 'COLOUR NAME' attribute
 -- 2024-10-09   8.0         ZY Wong     Improve on error msg of product sub category & product type validation
@@ -38,45 +39,40 @@ SET XACT_ABORT ON
 
         IF @warehouseId IS NULL
         BEGIN
-        	SET @ErrMessage = 'Warehouse is not configured in system.';
+        	SET @ErrMessage = '[System Error] Warehouse is not setup in the system. Please setup the warehouse.';
 			THROW 60000, @ErrMessage, 1;
         END
 
 		DROP TABLE IF EXISTS #invDump;
 
 		SELECT logId, productCategory, productSubCategory, productType, itemCode, modelNo, inventorySKU, productName, productPrice, [description] as itemDesc, 
-			grossWeight, grossLength, grossWidth, grossHeight, netWeight, netLength, netWidth, netHeight,
-			cbm, measurement, color, packaging, size, glCode, virtualProduct
+			grossWeight, grossLength, grossWidth, grossHeight, netWeight, netLength, netWidth, netHeight, cbm, measurement, color, size, glCode, virtualProduct
 		INTO #invDump
 		FROM temp_inventoryLog
-		WHERE fileName = @fileName
-            AND (ISNULL(productCategory,'') <> '' OR ISNULL(productSubCategory,'') <> '' OR ISNULL(productType,'') <> '')  --ignore empty line
+		WHERE [fileName] = @fileName
+			AND (ISNULL(productCategory,'') <> '' OR ISNULL(productSubCategory,'') <> '' OR ISNULL(productType,'') <> '')  --ignore empty line
 
 /*** Start: data validation ***/
 /*** insert inventory sp, check ALL itemcode passed in, product name NOT allow null ***/
            
-		IF (SELECT COUNT(1) FROM #invDump WHERE itemCode IS NULL) > 0
-		BEGIN
-			SET @ErrMessage = 'Item Code is missing in file.';
-			THROW 60000, @ErrMessage, 1;
-		END
-
-        IF (SELECT COUNT(1) FROM #invDump WHERE ISNULL(itemCode,'') = '') > 0
+		IF EXISTS(SELECT 1 FROM #invDump WHERE ISNULL(itemCode,'') = '')
 		BEGIN
 			SET @ErrMessage = 'Item Code is compulsory, please fill in.';
 			THROW 60000, @ErrMessage, 1;
 		END
 
+		-- duplicate itemCode in same file
         DROP TABLE IF EXISTS #checkDupItemCode;
 
         SELECT itemCode, COUNT(itemCode) as itemCodeCount 
         INTO #checkDupItemCode
         FROM #invDump 
         GROUP BY itemCode
+		HAVING COUNT(itemCode) > 1
 
-		IF (SELECT COUNT(1) FROM #checkDupItemCode  WHERE itemCodeCount > 1) > 0
+		IF EXISTS(SELECT 1 FROM #checkDupItemCode)
 		BEGIN
-			SET @ErrMessage = (SELECT 'Item Code ' + STRING_AGG(CONVERT(VARCHAR(max), itemCode), ',') + ' are duplicate in file.' 
+			SET @ErrMessage = (SELECT 'Item Code ' + STRING_AGG(CONVERT(VARCHAR(MAX), itemCode), ',') + ' is duplicate in file.' 
                                 FROM (SELECT itemCode 
                                         FROM #checkDupItemCode  
                                         WHERE itemCodeCount > 1)g
@@ -84,9 +80,10 @@ SET XACT_ABORT ON
 			THROW 60000, @ErrMessage, 1;
 		END
 
+		-- itemCode exists in system
         DROP TABLE IF EXISTS #checkExistsItemCode;
 
-		SELECT invId, i.itemCode
+		SELECT inv.invId, i.itemCode
 		INTO #checkExistsItemCode
 		FROM md_Inventory inv
 			INNER JOIN #invDump i
@@ -94,7 +91,7 @@ SET XACT_ABORT ON
 
 		IF (SELECT COUNT(1) FROM #checkExistsItemCode) > 0
 		BEGIN
-			SET @ErrMessage = (SELECT 'Item Code ' + STRING_AGG(CONVERT(VARCHAR(max), itemCode), ',') + ' already exists in system.' 
+			SET @ErrMessage = (SELECT 'Item Code ' + STRING_AGG(CONVERT(VARCHAR(max), itemCode), ',') + ' already exists in the system. Please enter a valid Item Code.' 
                                 FROM #checkExistsItemCode
                                 );
 			THROW 60000, @ErrMessage, 1;
@@ -259,7 +256,6 @@ SET XACT_ABORT ON
         WHERE ISNULL(itemDesc,'') = '' 
             AND productName IS NOT NULL
 
-
 /*** End: data validation ***/
 
         BEGIN TRANSACTION
@@ -277,9 +273,8 @@ SET XACT_ABORT ON
             CASE WHEN virtualProduct = 'Y' THEN 1 ELSE 0 END as isVirtual, isBuffer,  1 as status, getdate(), getdate()
 		FROM #invDump
 
-		-- insert product attribute (color, packaging, size)
+		-- insert product attribute (color, size)
 		DECLARE @colorId INT = (SELECT categoryId FROM md_MasterCategory WHERE categoryName = 'COLOUR NAME' AND categoryParentID = 18)
-		DECLARE @packagingId INT = (SELECT categoryId FROM md_MasterCategory WHERE categoryName = 'Packaging' AND categoryParentID = 18)
 		DECLARE @sizeId INT = (SELECT categoryId FROM md_MasterCategory WHERE categoryName = 'Size' AND categoryParentID = 18)
 
 		INSERT INTO inventory_attributes (invId, categoryId, value)
@@ -288,12 +283,6 @@ SET XACT_ABORT ON
 			INNER JOIN @Inventory inv
 				ON l.itemCode = inv.itemCode
 		WHERE ISNULL(l.color,'') <> '' 
-		UNION ALL 
-		SELECT inv.invID, @packagingId, l.packaging
-		FROM #invDump l
-			INNER JOIN @Inventory inv
-				ON l.itemCode = inv.itemCode
-		WHERE ISNULL(l.packaging,'') <> '' 
 		UNION ALL 
 		SELECT inv.invID, @sizeId, l.size
 		FROM #invDump l
@@ -315,7 +304,7 @@ SET XACT_ABORT ON
 
         COMMIT TRANSACTION
 
-		DELETE FROM temp_inventoryLog WHERE fileName = @fileName
+		DELETE FROM temp_inventoryLog WHERE [fileName] = @fileName;
 
 		SELECT '_SUCCESS_' as status, 'Inventory has been successful created.' as returnMessage
         
@@ -329,7 +318,7 @@ SET XACT_ABORT ON
 			ROLLBACK TRANSACTION 
 		END
 
-		DELETE FROM temp_inventoryLog WHERE fileName = @fileName
+		DELETE FROM temp_inventoryLog WHERE [fileName] = @fileName;
 
         IF @ErrMessage IS NULL
             SET @ErrMessage = 'Line ' + CAST(ERROR_LINE() AS VARCHAR) + ':' + ERROR_MESSAGE();
@@ -341,4 +330,3 @@ SET XACT_ABORT ON
 END
 
 GO
-
