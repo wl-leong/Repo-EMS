@@ -32,9 +32,9 @@ SET XACT_ABORT ON;
 
 			DROP TABLE IF EXISTS #soList;
 
-			SELECT * 
+			SELECT soHeaderId
 			INTO #soList
-			FROM  OPENJSON(@Json, '$.soList') 
+			FROM OPENJSON(@Json, '$.soList') 
    				WITH (
 					soHeaderId BIGINT	N'$.soHeaderId'
 				)
@@ -61,13 +61,34 @@ SET XACT_ABORT ON;
 
 			DROP TABLE IF EXISTS #poInfo;
 
-			SELECT po.poId, po.poName, po.shipToId, po.reference1, CONVERT(VARCHAR(8), REPLACE(po.poEarlyShipDate,'-','')) as shipDate, po.poStatus, li.poDetailsId
+			SELECT po.poName, po.shipToId, po.reference1, CONVERT(VARCHAR(8), REPLACE(po.poEarlyShipDate,'-','')) as shipDate, po.poStatus, 
+				li.poDetailsId, li.invId, inv.productName, li.supplierSku, li.merchantSku, li.qty - li.lrQty as qty
 			INTO #poInfo
 			FROM #soInfo s
 				INNER JOIN poLineItem li
 					ON s.soLineItemId = li.soLineItemId
 				INNER JOIN poHeader po
-				   ON li.poId = po.poId
+					ON li.poId = po.poId
+				INNER JOIN md_Inventory inv
+					ON li.invId = inv.invId
+			WHERE li.itemStatus IN (1077, 1085) -- po: approved, released   
+				AND li.qty - li.lrQty > 0
+
+			IF EXISTS (SELECT 1 FROM #poInfo WHERE poStatus NOT IN (1077, 1085))  -- po: approved, released
+			BEGIN
+				SET @ErrMessage = (SELECT 'PO # ' + STRING_AGG(CONVERT(VARCHAR(MAX), poName), ',') + ', status is not APPROVED/ RELEASED. Please check the PO status before export.' 
+									FROM (SELECT DISTINCT poName 
+											FROM #poInfo 
+											WHERE poStatus NOT IN (1077, 1085))g
+								   );
+				THROW 60000, @ErrMessage, 1;
+			END
+
+			IF NOT EXISTS (SELECT 1 FROM #poInfo)
+			BEGIN
+				SET @ErrMessage = 'No pending PO items found for the selected SO# to export.';
+				THROW 60000, @ErrMessage, 1;
+			END
 
 			ALTER TABLE #poInfo ADD portId VARCHAR(50);
 			ALTER TABLE #poInfo ADD pod VARCHAR(50);
@@ -82,32 +103,9 @@ SET XACT_ABORT ON;
 			FROM md_Port p
 			WHERE #poInfo.portId = p.portId
  
-			IF EXISTS (SELECT 1 FROM #poInfo WHERE poStatus NOT IN (1077, 1085))  -- po: approved, released
-			BEGIN
-				SET @ErrMessage = (SELECT 'PO # ' + STRING_AGG(CONVERT(VARCHAR(MAX), poName), ',') + ', only APPROVED/ RELEASED PO''s are allowed to export.' 
-									FROM (SELECT DISTINCT poName 
-											FROM #poInfo 
-											WHERE poStatus NOT IN (1077, 1085))g
-								   );
-				THROW 60000, @ErrMessage, 1;
-			END
-
-			DROP TABLE IF EXISTS #poItem;
-
-			SELECT po.poName, po.reference1, po.pod, li.invId, li.supplierSku, li.merchantSku, li.qty - li.lrQty as qty, po.shipDate, li.poDetailsId
-			INTO #poItem
-			FROM poLineItem li
-				INNER JOIN #poInfo po
-					ON li.poDetailsId = po.poDetailsId
-			WHERE li.itemStatus IN (1077, 1085) -- po: approved, released   
-				AND li.qty - li.lrQty > 0
-
-			SELECT p.poName, p.reference1 as customerPo, p.pod, inv.productName, p.supplierSku, p.merchantSku, p.qty, p.shipDate, '' as containerType, '' as containerSeq, '' as notes, 
-				'' as qtyPerCarton, p.poDetailsId
-			FROM #poItem p 
-				INNER JOIN md_inventory inv
-					ON p.invId = inv.invId
-			ORDER BY p.poName
+			SELECT poName, reference1 as customerPo, pod, productName, supplierSku, merchantSku, qty, shipDate, '' as containerType, '' as containerSeq, '' as notes, '' as qtyPerCarton, poDetailsId
+			FROM #poInfo 
+			ORDER BY poName, poDetailsId
 
 			RETURN 0
 	END TRY
