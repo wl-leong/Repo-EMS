@@ -7,6 +7,7 @@
 --
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-10-02   2.1         WL Leong    Join #itemCost by row instead of invId, avoid duplicate rows when same invId has different csCost
 -- 2025-06-17   2.0         ZY Wong     For CIPL return rowNo order by distinct inventory type
 -- 2025-06-04	1.0			ZY Wong 	Initial
 -- ==========================================================================================
@@ -65,7 +66,8 @@ BEGIN
         -- items grp by invid
         DROP TABLE IF EXISTS #itemInfo;
 
-        SELECT shp.invId, shp.customerSku, UPPER(s.soItemDesc) as soItemDesc, SUM(shp.shipQty) as shipQty, s.csCost, 
+        -- itemRowId: same invId may appear in multiple rows (e.g. different csCost / desc)
+        SELECT ROW_NUMBER() OVER (ORDER BY shp.invId) as itemRowId, shp.invId, shp.customerSku, UPPER(s.soItemDesc) as soItemDesc, SUM(shp.shipQty) as shipQty, s.csCost, 
             CONVERT(NUMERIC(13,2), 0) as discount, CONVERT(NUMERIC(13,2), 0) as tax
         INTO #itemInfo
         FROM #shipmentItem shp
@@ -99,7 +101,7 @@ BEGIN
         -- calculate cost per invId
         DROP TABLE IF EXISTS #itemCost;
 
-        SELECT invId, shipQty, (shipQty * csCost) as ttlCost, (shipQty * discount) as ttlDiscount, (shipQty * tax) as ttlTax, (shipQty * cbm) as ttlCbm
+        SELECT itemRowId, invId, shipQty, (shipQty * csCost) as ttlCost, (shipQty * discount) as ttlDiscount, (shipQty * tax) as ttlTax, (shipQty * cbm) as ttlCbm
         INTO #itemCost
         FROM #itemInfo
 
@@ -137,7 +139,7 @@ BEGIN
                 @invCost as invCost, @invDiscount as invDiscount, @invTax as invTax, @invAmount as invAmount
             FROM #itemInfo li
                 INNER JOIN #itemCost c
-                    ON li.invId = c.invId
+                    ON li.itemRowId = c.itemRowId
 
         END
         ELSE
