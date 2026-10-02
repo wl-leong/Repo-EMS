@@ -27,3 +27,6 @@ Thumbs.db
 .DS_Store
 *.vsidx
 *.sqlite
+
+# Visual Studio
+.vs/
