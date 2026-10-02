@@ -6,6 +6,7 @@
 --
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-10-02	6.1			ZY Wong		Simplify sp
 -- 2026-10-02	6.0			ZY Wong		Restructure sp, link poLineItem via soLineItemId
 -- 2025-08-13	5.0			ZY Wong		Remove cartonMaterial, cartonQty
 -- 2025-05-28	4.0			ZY Wong		Return cartonMaterial, cartonQty, qtyPerCarton, poDetailsId
@@ -16,8 +17,8 @@
 -- 2024-06-05	2.0			WL Leong	Add in customer po#
 -- 2024-05-13	1.0			ZY Wong		Initial
 -- ==========================================================================================
--- EXEC SSP_SalesOrder_ExportLRTemplate N'{"soList":[{"soHeaderId":"41416"}]}'
-CREATE PROCEDURE [dbo].[SSP_SalesOrder_ExportLRTemplate]
+-- EXEC SSP_SalesOrder_ExportLRTemplate N'{"soList":[{"soHeaderId":"29395"}]}'
+ALTER PROCEDURE [dbo].[SSP_SalesOrder_ExportLRTemplate]
 @Json NVARCHAR(MAX)
 AS
 BEGIN
@@ -41,13 +42,12 @@ SET XACT_ABORT ON;
 
 			DROP TABLE IF EXISTS #soInfo;
  
-			SELECT so.soHeaderId, so.soName, so.soStatus, li.soLineItemId
+			SELECT so.soHeaderId, so.soName, so.soStatus 
 			INTO #soInfo
 			FROM #soList l
 				INNER JOIN soHeader so
 					ON l.soHeaderId = so.soHeaderId
-				INNER JOIN soLineItem li
-					ON so.soHeaderId = li.soHeaderId
+ 
 
 			IF EXISTS (SELECT 1 FROM #soInfo WHERE soStatus NOT IN (2125))  -- so: in production
 			BEGIN
@@ -65,15 +65,17 @@ SET XACT_ABORT ON;
 				li.poDetailsId, li.invId, inv.productName, li.supplierSku, li.merchantSku, li.qty - li.lrQty as qty
 			INTO #poInfo
 			FROM #soInfo s
+				INNER JOIN soLineitem sli
+					ON s.soHeaderId = sli.soHeaderId
 				INNER JOIN poLineItem li
-					ON s.soLineItemId = li.soLineItemId
+					ON sli.soLineItemId = li.soLineItemId
 				INNER JOIN poHeader po
 					ON li.poId = po.poId
 				INNER JOIN md_Inventory inv
 					ON li.invId = inv.invId
 			WHERE li.itemStatus IN (1077, 1085) -- po: approved, released   
 				AND li.qty - li.lrQty > 0
-
+ 
 			IF EXISTS (SELECT 1 FROM #poInfo WHERE poStatus NOT IN (1077, 1085))  -- po: approved, released
 			BEGIN
 				SET @ErrMessage = (SELECT 'PO # ' + STRING_AGG(CONVERT(VARCHAR(MAX), poName), ',') + ', status is not APPROVED/ RELEASED. Please check the PO status before export.' 
