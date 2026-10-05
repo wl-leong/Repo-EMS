@@ -7,7 +7,6 @@
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
--- 2026-10-02	4.1			WL Leong	Support same invId in multiple WO lines: lock per line, sum qty per balance record
 -- 2025-05-06	4.0			WL Leong	if work order have soLineItem then will lock the quantity for the SO until further release
 -- 2025-05-05	3.0			WL Leong	Add in soName in reason for tracing
 -- 2025-04-18	2.1			WL Leong	Add in inventory movement
@@ -77,42 +76,50 @@ BEGIN
             WHERE workOrderItemStatus = 5230 -- only open status
  
       /* Update inventoryMovement, inventoryBalanceWH, poLineItem.rcvQty */
+			DECLARE @lockQty as TABLE(warehouseId INT, companyId INT,  invId INT, workOrderName VARCHAR(20), soName VARCHAR(20),qty numeric(13,4))
+
             INSERT INTO inventoryMovement (warehouseId, companyId, action, actionKey, invId, qty, reason, enterBy, enterDate)
+			OUTPUT INSERTED.warehouseId, INSERTED.companyId, INSERTED.invId,INSERTED.actionKey, INSERTED.reason, INSERTED.qty INTO @lockQty
             SELECT warehouseId, companyId, 'PROD' as action, workOrderName, invId, qty, soName, @updateBy as enterBy, getdate() as enterDate
             FROM #itemList
 
-			-- lock per WO line (same invId may appear in multiple lines)
+      
 			INSERT INTO inventoryBalanceWH_lock(companyId, warehouseId, invId, soHeaderId, soLineItemId, lockQty, enterBy, enterDate)
-			SELECT companyId, warehouseId, invId, soHeaderId, soLineItemId, qty, @updateBy as enterBy, getdate() as enterDate
-			FROM #itemList
-			WHERE soLineItemId > 0
+			SELECT lock.companyId, lock.warehouseId, lock.invId, li.soHeaderId, li.soLineItemId, lock.qty, @updateBy as enterBy, getdate() as enterDate
+			FROM #itemList li
+				INNER JOIN @lockQty lock
+					ON li.soName = lock.soName
+					AND li.invid = lock.invId
+					AND li.workOrderName = lock.workOrderName
+			WHERE li.soLineItemId > 0
 
-            -- total qty per balance record (same invId may appear in multiple lines)
-            DROP TABLE IF EXISTS #itemQty;
+            DROP TABLE IF EXISTS #missingWhBalance;
 
-            SELECT warehouseId, companyId, invId, SUM(qty) as qty,
-                SUM(CASE WHEN soLineItemId > 0 THEN qty ELSE 0 END) as lockQty
-            INTO #itemQty
-            FROM #itemList
-            GROUP BY warehouseId, companyId, invId
+            SELECT bal.invBalanceId, pr.warehouseId, pr.companyId, pr.invId, qty
+            INTO #missingWhBalance
+            FROM #itemList pr
+                LEFT JOIN inventorybalancewh bal
+                    ON pr.warehouseId = bal.warehouseId
+                    AND pr.companyId = bal.companyId
+                    AND pr.invId = bal.invId
 
+ 
             -- create empty balance record
-            INSERT INTO inventoryBalanceWH (warehouseId, companyId, invId, balanceQty, lockQty, createBy, createDate, updateBy, updateDate)
-            SELECT itm.warehouseId, itm.companyId, itm.invId, 0 as balanceQty, 0 as lockQty, @updateBy, getdate(), @updateBy, getdate()
-            FROM #itemQty itm
-            WHERE NOT EXISTS (SELECT 1
-                                FROM inventoryBalanceWH bal
-                                WHERE bal.warehouseId = itm.warehouseId
-                                    AND bal.companyId = itm.companyId
-                                    AND bal.invId = itm.invId)
+            IF (SELECT COUNT(1) FROM #missingWhBalance WHERE invBalanceId IS NULL) > 0
+            BEGIN
+                INSERT INTO inventoryBalanceWH (warehouseId, companyId, invId, balanceQty, lockQty, createBy, createDate, updateBy, updateDate)
+                SELECT warehouseId, companyId, invId, 0 as balanceQty, 0 as lockQty, @updateBy, getdate(), @updateBy, getdate()
+                FROM #itemList
+                WHERE invBalanceId IS NULL
+            END
 
             UPDATE bal SET
                 balanceQty = bal.balanceQty + itm.qty,
-				lockQty = bal.lockQty + itm.lockQty,
+				lockQty = bal.lockQty + (CASE WHEN itm.solineItemId > 0 THEN itm.qty ELSE 0 END),
                 updateBy = @updateBy,
                 updateDate = getdate()
             FROM inventoryBalanceWH bal
-                INNER JOIN #itemQty itm
+                INNER JOIN #itemList itm
                     ON bal.invId = itm.invId
                     AND bal.companyId = itm.companyId
                     AND bal.warehouseId = itm.warehouseId

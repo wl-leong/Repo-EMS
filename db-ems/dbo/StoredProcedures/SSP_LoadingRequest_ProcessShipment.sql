@@ -7,7 +7,6 @@
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
--- 2026-10-02	7.1			WL Leong	Stock check by total qty per invId, fix soName lookup
 -- 2025-05-06	7.0			WL Leong	Fix POD, release lockQty
 -- 2024-11-29   6.0         ZY Wong     Add containerNo, containerSealNo, containerMaxGross, containerTare, haulierId, containerPullInDate, containerPullOutDate into #lrListing
 -- 2024-02-29	5.0			WL Leong	Add inventory movement
@@ -84,30 +83,38 @@ BEGIN
 		UPDATE #lrLineItem SET
 			soName = s.soName
 		FROM soHeader s
-		WHERE #lrLineItem.soHeaderId = s.soHeaderId
+		WHERE s.soHeaderId = s.soHeaderId
+ 
 
-		-- check stock by total shipQty per invId (same invId may appear in multiple LR lines)
-		DROP TABLE IF EXISTS #stockCheck;
+        ALTER TABLE #lrLineItem ADD warehouseBalance INT 
 
-		SELECT lr.invId, lr.supplierSku, lr.shipQty, ISNULL(bal.balanceQty, 0) as balanceQty
-		INTO #stockCheck
-		FROM (SELECT companyId, invId, MIN(supplierSku) as supplierSku, SUM(shipQty) as shipQty
-				FROM #lrLineItem
-				GROUP BY companyId, invId) lr
-			OUTER APPLY (SELECT SUM(b.balanceQty) as balanceQty
-							FROM inventoryBalanceWh b
-							WHERE b.companyId = lr.companyId
-								AND b.invId = lr.invId
-								AND b.warehouseId = @warehouseId) bal
+		DROP TABLE IF EXISTS #warehouseBal;
 
-		IF EXISTS (SELECT 1 FROM #stockCheck WHERE balanceQty < shipQty)
+ 		SELECT bal.invId, SUM(balanceQty) as balanceQty
+		INTO #warehouseBal
+		FROM #lrLineItem lr
+            INNER JOIN inventoryBalanceWh bal
+                ON lr.companyId = bal.companyId
+                AND lr.invId = bal.invId
+		WHERE bal.warehouseId = @warehouseId
+		GROUP BY bal.invId
+		 
+        UPDATE #lrLineItem SET
+            warehouseBalance = balanceQty
+        FROM #warehouseBal bal
+        WHERE #lrLineItem.invId = bal.invId
+ 
+ 
+		IF (SELECT COUNT(1) FROM #lrLineItem WHERE ISNULL(warehouseBalance, 0) < shipQty) > 0
 		BEGIN
-			SET @returnMessage = (SELECT TOP 1 'LR item ' + supplierSku + ' has no enough stock to process. Required: ' 
-										+ CONVERT(VARCHAR(20), shipQty) + ', available: ' + CONVERT(VARCHAR(20), balanceQty) + '.'
-									FROM #stockCheck
-									WHERE balanceQty < shipQty);
-
-			THROW 60000, @returnMessage, 1;
+			SET @returnMessage = (SELECT 'LR item ' + supplierSku + ' has no enough stock to process.'
+                                    FROM ( SELECT TOP 1 supplierSku
+			                                FROM #lrLineItem 
+			                                WHERE ISNULL(warehouseBalance, 0) < shipQty
+                                          )g
+                                    );
+ 
+            THROW 60000, @returnMessage, 1;
 		END
 
         DECLARE @lrContainerId BIGINT, @soHeaderId BIGINT, @bol VARCHAR(30), @bolShipmentWeight NUMERIC(13,4) = 0
