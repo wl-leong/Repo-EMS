@@ -139,3 +139,16 @@ END
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_workOrderLineItem_workOrderHeaderId]
+    ON [dbo].[workOrderLineItem]([workOrderHeaderId] ASC)
+    INCLUDE([workOrderItemStatus]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_workOrderLineItem_soLineItemId]
+    ON [dbo].[workOrderLineItem]([soLineItemId] ASC);
+
+
+GO
+

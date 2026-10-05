@@ -9,3 +9,10 @@ CREATE TABLE [dbo].[userRole] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_userRole_userId]
+    ON [dbo].[userRole]([userId] ASC)
+    INCLUDE([userrolecompanyroleid]);
+
+
+GO
+

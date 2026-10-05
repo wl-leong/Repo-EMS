@@ -43,3 +43,28 @@ CREATE TABLE [dbo].[soHeader] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_soHeader_companyId_soStatus]
+    ON [dbo].[soHeader]([companyId] ASC, [soStatus] ASC)
+    INCLUDE([customerId], [soName], [soDate]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_soHeader_soName]
+    ON [dbo].[soHeader]([soName] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_soHeader_customerPO]
+    ON [dbo].[soHeader]([customerPO] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_soHeader_customerId]
+    ON [dbo].[soHeader]([customerId] ASC);
+
+
+GO
+

@@ -28,3 +28,22 @@ CREATE TABLE [dbo].[lrHeader] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_lrHeader_companyId_lrStatus]
+    ON [dbo].[lrHeader]([companyId] ASC, [lrStatus] ASC)
+    INCLUDE([lrName]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_lrHeader_lrName]
+    ON [dbo].[lrHeader]([lrName] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_lrHeader_ref_customerLrHeaderId]
+    ON [dbo].[lrHeader]([ref_customerLrHeaderId] ASC);
+
+
+GO
+

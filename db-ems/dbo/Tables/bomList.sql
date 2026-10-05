@@ -16,3 +16,9 @@ CREATE TABLE [dbo].[bomList] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_bomList_bomBuildId]
+    ON [dbo].[bomList]([bomBuildId] ASC);
+
+
+GO
+

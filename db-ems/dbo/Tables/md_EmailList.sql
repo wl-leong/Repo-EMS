@@ -14,3 +14,9 @@ CREATE TABLE [dbo].[md_EmailList] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_EmailList_companyId_emailCategoryId]
+    ON [dbo].[md_EmailList]([companyId] ASC, [emailCategoryId] ASC);
+
+
+GO
+

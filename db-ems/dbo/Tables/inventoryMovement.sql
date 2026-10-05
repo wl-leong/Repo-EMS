@@ -10,8 +10,20 @@ CREATE TABLE [dbo].[inventoryMovement] (
     [reason]              VARCHAR (200) NULL,
     [enterBy]             INT           NOT NULL,
     [enterDate]           DATETIME      NOT NULL,
-    CONSTRAINT [PK__inventor__D124D3F59D92B9C3] PRIMARY KEY CLUSTERED ([inventoryMovementId] ASC)
+    CONSTRAINT [PK_inventoryMovement] PRIMARY KEY CLUSTERED ([inventoryMovementId] ASC)
 );
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_inventoryMovement_companyId_enterDate]
+    ON [dbo].[inventoryMovement]([companyId] ASC, [enterDate] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_inventoryMovement_invId_warehouseId]
+    ON [dbo].[inventoryMovement]([invId] ASC, [warehouseId] ASC);
 
 
 GO

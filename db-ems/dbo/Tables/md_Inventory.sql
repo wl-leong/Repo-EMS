@@ -37,3 +37,15 @@ CREATE TABLE [dbo].[md_Inventory] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_Inventory_companyId_inventorySKU]
+    ON [dbo].[md_Inventory]([companyId] ASC, [inventorySKU] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_md_Inventory_itemCode]
+    ON [dbo].[md_Inventory]([itemCode] ASC);
+
+
+GO
+

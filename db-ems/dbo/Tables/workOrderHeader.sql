@@ -118,3 +118,10 @@ END
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_workOrderHeader_companyId_workOrderStatus]
+    ON [dbo].[workOrderHeader]([companyId] ASC, [workOrderStatus] ASC)
+    INCLUDE([warehouseId], [workOrderName]);
+
+
+GO
+

@@ -4,8 +4,14 @@ CREATE TABLE [dbo].[companyRole] (
     [roleId]          INT      CONSTRAINT [DF__companyRo__roleI__2A164134] DEFAULT (NULL) NULL,
     [createdDateTime] DATETIME CONSTRAINT [DF__companyRo__creat__2B0A656D] DEFAULT (getdate()) NOT NULL,
     [status]          INT      CONSTRAINT [DF__companyRo__statu__2BFE89A6] DEFAULT ('1') NOT NULL,
-    CONSTRAINT [PK__companyR__3F28C341F89F751B] PRIMARY KEY CLUSTERED ([companyRoleId] ASC)
+    CONSTRAINT [PK_companyRole] PRIMARY KEY CLUSTERED ([companyRoleId] ASC)
 );
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_companyRole_companyId_roleId]
+    ON [dbo].[companyRole]([companyId] ASC, [roleId] ASC);
 
 
 GO

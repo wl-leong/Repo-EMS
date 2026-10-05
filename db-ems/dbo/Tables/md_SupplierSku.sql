@@ -22,3 +22,16 @@ CREATE TABLE [dbo].[md_SupplierSku] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_SupplierSku_invId_supplierId]
+    ON [dbo].[md_SupplierSku]([invId] ASC, [supplierId] ASC)
+    INCLUDE([statusflag], [isDefault]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_md_SupplierSku_supplierSku]
+    ON [dbo].[md_SupplierSku]([supplierSku] ASC);
+
+
+GO
+

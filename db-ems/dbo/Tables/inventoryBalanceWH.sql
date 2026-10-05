@@ -9,8 +9,21 @@ CREATE TABLE [dbo].[inventoryBalanceWH] (
     [createDate]   DATETIME NOT NULL,
     [updateBy]     INT      NULL,
     [updateDate]   DATETIME CONSTRAINT [DF__inventory__updat__76EBA2E9] DEFAULT (getdate()) NULL,
-    CONSTRAINT [PK__inventor__BCC6D63E44BDC5D3] PRIMARY KEY CLUSTERED ([invBalanceId] ASC)
+    CONSTRAINT [PK_IX_inventoryBalanceWH] PRIMARY KEY CLUSTERED ([invBalanceId] ASC)
 );
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_inventoryBalanceWH_invId_warehouseId]
+    ON [dbo].[inventoryBalanceWH]([invId] ASC, [warehouseId] ASC)
+    INCLUDE([companyId], [balanceQty], [lockQty]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_inventoryBalanceWH_warehouseId]
+    ON [dbo].[inventoryBalanceWH]([warehouseId] ASC);
 
 
 GO

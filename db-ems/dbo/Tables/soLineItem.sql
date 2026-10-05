@@ -35,3 +35,16 @@ CREATE TABLE [dbo].[soLineItem] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_soLineItem_soheaderId]
+    ON [dbo].[soLineItem]([soheaderId] ASC)
+    INCLUDE([invID], [soLineItemStatus]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_soLineItem_invID]
+    ON [dbo].[soLineItem]([invID] ASC);
+
+
+GO
+

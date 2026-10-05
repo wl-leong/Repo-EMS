@@ -22,3 +22,15 @@ CREATE TABLE [dbo].[procurementProcess] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_procurementProcess_companyId_status]
+    ON [dbo].[procurementProcess]([companyId] ASC, [status] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_procurementProcess_soLineItemId]
+    ON [dbo].[procurementProcess]([soLineItemId] ASC);
+
+
+GO
+

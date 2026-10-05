@@ -59,3 +59,16 @@ EXECUTE sp_addextendedproperty @name = N'MS_Description', @value = N'-1 cancel P
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_poHeader_companyId_poStatus]
+    ON [dbo].[poHeader]([companyId] ASC, [poStatus] ASC)
+    INCLUDE([supplierId], [poName]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_poHeader_poName]
+    ON [dbo].[poHeader]([poName] ASC);
+
+
+GO
+

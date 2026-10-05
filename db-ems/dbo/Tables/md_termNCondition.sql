@@ -9,7 +9,8 @@ CREATE TABLE [dbo].[md_termNCondition] (
     [enterBy]        INT            NULL,
     [enterDate]      DATETIME       CONSTRAINT [DEFAULT_md_customerTerm_enterDate] DEFAULT (getdate()) NULL,
     [updateBy]       INT            NULL,
-    [updateDate]     DATETIME       NULL
+    [updateDate]     DATETIME       NULL,
+    CONSTRAINT [PK_md_termNCondition] PRIMARY KEY CLUSTERED ([customerTermId] ASC)
 );
 
 

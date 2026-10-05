@@ -24,3 +24,9 @@ CREATE TABLE [dbo].[shipmentAddress] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_shipmentAddress_shipmentId]
+    ON [dbo].[shipmentAddress]([shipmentId] ASC);
+
+
+GO
+
