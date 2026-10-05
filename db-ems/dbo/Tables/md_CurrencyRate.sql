@@ -17,3 +17,10 @@ CREATE TABLE [dbo].[md_CurrencyRate] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_CurrencyRate_companyId_foreignCurrency_startDate]
+    ON [dbo].[md_CurrencyRate]([companyId] ASC, [foreignCurrency] ASC, [startDate] ASC)
+    INCLUDE([endDate], [foreignRate]);
+
+
+GO
+

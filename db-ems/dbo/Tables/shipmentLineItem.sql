@@ -23,3 +23,22 @@ CREATE TABLE [dbo].[shipmentLineItem] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_shipmentLineItem_shipmentId]
+    ON [dbo].[shipmentLineItem]([shipmentId] ASC)
+    INCLUDE([invId], [lineItemStatus]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_shipmentLineItem_soLineItemId]
+    ON [dbo].[shipmentLineItem]([soLineItemId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_shipmentLineItem_lrDetailsId]
+    ON [dbo].[shipmentLineItem]([lrDetailsId] ASC);
+
+
+GO
+

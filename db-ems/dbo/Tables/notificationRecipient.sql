@@ -12,3 +12,16 @@ CREATE TABLE [dbo].[notificationRecipient] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_notificationRecipient_userID_isRead]
+    ON [dbo].[notificationRecipient]([userID] ASC, [isRead] ASC)
+    INCLUDE([notificationID]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_notificationRecipient_notificationID]
+    ON [dbo].[notificationRecipient]([notificationID] ASC);
+
+
+GO
+

@@ -25,3 +25,15 @@ CREATE TABLE [dbo].[orderProcessLineItem] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_orderProcessLineItem_opId]
+    ON [dbo].[orderProcessLineItem]([opId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_orderProcessLineItem_soLineItemId]
+    ON [dbo].[orderProcessLineItem]([soLineItemId] ASC);
+
+
+GO
+

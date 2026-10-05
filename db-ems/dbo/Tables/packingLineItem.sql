@@ -19,3 +19,9 @@ CREATE TABLE [dbo].[packingLineItem] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_packingLineItem_packingHeaderId]
+    ON [dbo].[packingLineItem]([packingHeaderId] ASC);
+
+
+GO
+

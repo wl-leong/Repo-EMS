@@ -14,7 +14,8 @@ CREATE TABLE [dbo].[loadingPlanning] (
     [enterBy]           INT            NOT NULL,
     [enterDate]         DATETIME       NOT NULL,
     [updateBy]          INT            NULL,
-    [updateDate]        DATETIME       NULL
+    [updateDate]        DATETIME       NULL,
+    CONSTRAINT [PK_loadingPlanning] PRIMARY KEY CLUSTERED ([loadingPlanningId] ASC)
 );
 
 

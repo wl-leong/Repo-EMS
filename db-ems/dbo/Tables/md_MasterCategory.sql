@@ -10,3 +10,9 @@ CREATE TABLE [dbo].[md_MasterCategory] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_MasterCategory_categoryParentID_categoryName]
+    ON [dbo].[md_MasterCategory]([categoryParentID] ASC, [categoryName] ASC);
+
+
+GO
+

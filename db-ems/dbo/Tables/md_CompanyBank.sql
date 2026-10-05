@@ -15,7 +15,8 @@ CREATE TABLE [dbo].[md_CompanyBank] (
     [enterBy]             INT           NOT NULL,
     [enterDate]           DATETIME      CONSTRAINT [DF_md_companyBank_enterDate] DEFAULT (getdate()) NOT NULL,
     [updateBy]            INT           NULL,
-    [updateDate]          DATETIME      NULL
+    [updateDate]          DATETIME      NULL,
+    CONSTRAINT [PK_md_CompanyBank] PRIMARY KEY CLUSTERED ([bankId] ASC)
 );
 
 

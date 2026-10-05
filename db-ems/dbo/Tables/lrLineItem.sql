@@ -32,3 +32,35 @@ CREATE TABLE [dbo].[lrLineItem] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_lrLineItem_lrHeaderId]
+    ON [dbo].[lrLineItem]([lrHeaderId] ASC)
+    INCLUDE([itemStatus]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_lrLineItem_lrContainerId]
+    ON [dbo].[lrLineItem]([lrContainerId] ASC)
+    INCLUDE([itemStatus]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_lrLineItem_soLineItemId]
+    ON [dbo].[lrLineItem]([soLineItemId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_lrLineItem_soHeaderId]
+    ON [dbo].[lrLineItem]([soHeaderId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_lrLineItem_poDetailsId]
+    ON [dbo].[lrLineItem]([poDetailsId] ASC);
+
+
+GO
+

@@ -35,3 +35,22 @@ CREATE TABLE [dbo].[poLineItem] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_poLineItem_poId]
+    ON [dbo].[poLineItem]([poId] ASC)
+    INCLUDE([invID], [itemStatus]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_poLineItem_soLineItemId]
+    ON [dbo].[poLineItem]([soLineItemId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_poLineItem_invID]
+    ON [dbo].[poLineItem]([invID] ASC);
+
+
+GO
+

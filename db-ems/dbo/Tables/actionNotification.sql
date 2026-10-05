@@ -8,8 +8,21 @@ CREATE TABLE [dbo].[actionNotification] (
     [payload]              NVARCHAR (MAX) NULL,
     [comment]              VARCHAR (256)  NULL,
     [createDate]           DATETIME       DEFAULT (getdate()) NULL,
-    PRIMARY KEY CLUSTERED ([actionNotificationID] ASC)
+    CONSTRAINT [PK_actionNotification] PRIMARY KEY CLUSTERED ([actionNotificationID] ASC)
 );
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_actionNotification_corporateId_sourceModule]
+    ON [dbo].[actionNotification]([corporateId] ASC, [sourceModule] ASC)
+    INCLUDE([sourceRecordId]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_actionNotification_sourceRecordId]
+    ON [dbo].[actionNotification]([sourceRecordId] ASC);
 
 
 GO

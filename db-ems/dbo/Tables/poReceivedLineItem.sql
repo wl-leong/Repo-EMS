@@ -21,3 +21,15 @@ CREATE TABLE [dbo].[poReceivedLineItem] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_poReceivedLineItem_poRcvHeaderId]
+    ON [dbo].[poReceivedLineItem]([poRcvHeaderId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_poReceivedLineItem_poDetailsId]
+    ON [dbo].[poReceivedLineItem]([poDetailsId] ASC);
+
+
+GO
+

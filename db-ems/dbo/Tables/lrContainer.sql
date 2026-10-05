@@ -48,3 +48,10 @@ CREATE TABLE [dbo].[lrContainer] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_lrContainer_lrHeaderId]
+    ON [dbo].[lrContainer]([lrHeaderId] ASC)
+    INCLUDE([containerStatus]);
+
+
+GO
+

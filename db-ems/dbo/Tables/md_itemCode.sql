@@ -14,3 +14,9 @@ CREATE TABLE [dbo].[md_itemCode] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_itemCode_companyId_condition_prodCategoryId]
+    ON [dbo].[md_itemCode]([companyId] ASC, [condition] ASC, [prodCategoryId] ASC);
+
+
+GO
+

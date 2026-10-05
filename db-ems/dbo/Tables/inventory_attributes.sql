@@ -10,3 +10,10 @@ CREATE TABLE [dbo].[inventory_attributes] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_inventory_attributes_invID_categoryId]
+    ON [dbo].[inventory_attributes]([invID] ASC, [categoryId] ASC)
+    INCLUDE([value]);
+
+
+GO
+

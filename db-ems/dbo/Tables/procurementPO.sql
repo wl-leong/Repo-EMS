@@ -14,3 +14,15 @@ CREATE TABLE [dbo].[procurementPO] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_procurementPO_procurementProcessId]
+    ON [dbo].[procurementPO]([procurementProcessId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_procurementPO_poLineItemId]
+    ON [dbo].[procurementPO]([poLineItemId] ASC);
+
+
+GO
+

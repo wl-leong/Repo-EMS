@@ -19,3 +19,9 @@ CREATE TABLE [dbo].[poReceivedHeader] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_poReceivedHeader_supplierId_supplierDO]
+    ON [dbo].[poReceivedHeader]([supplierId] ASC, [supplierDO] ASC);
+
+
+GO
+

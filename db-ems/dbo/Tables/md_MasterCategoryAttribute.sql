@@ -7,8 +7,15 @@ CREATE TABLE [dbo].[md_MasterCategoryAttribute] (
     [enterBy]          INT          NOT NULL,
     [enterDate]        DATETIME     CONSTRAINT [DF_ContainerAttribute_enterDate] DEFAULT (getdate()) NOT NULL,
     [updateBy]         INT          NULL,
-    [updateDate]       DATETIME     NULL
+    [updateDate]       DATETIME     NULL,
+    CONSTRAINT [PK_md_MasterCategoryAttribute] PRIMARY KEY CLUSTERED ([attributeId] ASC)
 );
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_md_MasterCategoryAttribute_masterCategoryId]
+    ON [dbo].[md_MasterCategoryAttribute]([masterCategoryId] ASC);
 
 
 GO

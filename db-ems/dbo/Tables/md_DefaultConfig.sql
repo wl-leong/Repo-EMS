@@ -10,3 +10,10 @@ CREATE TABLE [dbo].[md_DefaultConfig] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_DefaultConfig_companyId_configName]
+    ON [dbo].[md_DefaultConfig]([companyId] ASC, [configName] ASC)
+    INCLUDE([configValue]);
+
+
+GO
+

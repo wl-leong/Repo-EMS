@@ -31,3 +31,9 @@ EXECUTE sp_addextendedproperty @name = N'MS_Description', @value = N'port of dis
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_ShipToDestination_customerId]
+    ON [dbo].[md_ShipToDestination]([customerId] ASC);
+
+
+GO
+

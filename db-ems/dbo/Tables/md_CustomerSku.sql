@@ -27,3 +27,22 @@ CREATE TABLE [dbo].[md_CustomerSku] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_md_CustomerSku_customerId_customerSku]
+    ON [dbo].[md_CustomerSku]([customerId] ASC, [customerSku] ASC)
+    INCLUDE([invID], [statusflag]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_md_CustomerSku_invID]
+    ON [dbo].[md_CustomerSku]([invID] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_md_CustomerSku_merchantSKU]
+    ON [dbo].[md_CustomerSku]([merchantSKU] ASC);
+
+
+GO
+

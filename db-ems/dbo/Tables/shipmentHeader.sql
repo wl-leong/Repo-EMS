@@ -60,3 +60,34 @@ CREATE TABLE [dbo].[shipmentHeader] (
 
 GO
 
+CREATE NONCLUSTERED INDEX [IX_shipmentHeader_companyId_shipmentStatus]
+    ON [dbo].[shipmentHeader]([companyId] ASC, [shipmentStatus] ASC)
+    INCLUDE([customerId], [shipId]);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_shipmentHeader_lrHeaderId]
+    ON [dbo].[shipmentHeader]([lrHeaderId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_shipmentHeader_soHeaderId]
+    ON [dbo].[shipmentHeader]([soHeaderId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_shipmentHeader_shipId]
+    ON [dbo].[shipmentHeader]([shipId] ASC);
+
+
+GO
+
+CREATE NONCLUSTERED INDEX [IX_shipmentHeader_invoiceId]
+    ON [dbo].[shipmentHeader]([invoiceId] ASC);
+
+
+GO
+
