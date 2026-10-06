@@ -7,19 +7,19 @@
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
--- 2026-09-04	4.0			ZY Wong		Remove carton material & qtyPerCarton, improve validation
+-- 2026-09-04	4.0			ZY Wong		Remove carton material & qtyPerCarton & feedStartDate & feedEndDate, improve validation
 -- 2025-08-26   3.0         Zy Wong     Add carton material & qtyPerCarton
 -- 2024-11-09	2.0			WL Leong	Remove validaion on duplicate check in the for update, Add tagDivision
 -- 2024-05-09	1.0			ZY Wong		Initial version
 -- =============================================
 /*
-select * from md_customersku where customerSKuId = 427
+select * from md_customersku where customerSKuId in (427,595)
 declare @Json VARCHAR(MAX), @userId INT = 1;
 set @Json = N'{
 	"customerSkuList": {
 		"companyId": "11",
 		"customerId": "26",
-		"customerSkuId": "427",
+		"customerSkuId": "595",
 		"invId": "603",
 		"customerSku": "YZ5336278612003",
 		"merchantSku": "669924991",
@@ -27,16 +27,12 @@ set @Json = N'{
 		"itemDesc": "YOUR ZONE TOY CHEST, WHITE",
 		"currencyCode": "1121",
 		"csCost": "4.2222",
-		"feedStartDate": "2024-05-11",
-		"feedingEndDate": "2024-05-11",
 		"action": "Update",
 		"division":"3232"
-	}
-}'
+	}}'
 
 EXEC [SSP_CustomerSku_UpsertInfo] @Json, @userId
 */
-
 
 CREATE PROCEDURE [dbo].[SSP_CustomerSku_UpsertInfo]
 @Json NVARCHAR(MAX),
@@ -52,12 +48,10 @@ SET XACT_ABORT ON
         --declare @userId INT = 1
         --set @Json = N'{"customerSkuList":{"companyId":"4","customerId":"29","customerSkuId":"2661","invId":"3128","customerSku":"24461 WH","merchantSku":"24461 WH","itemDesc":"MS CORNER 6-CUBE STORAGE ORGANIZER","currencyCode":"1120","csCost":"0","feedStartDate":"2025-06-12","feedingEndDate":"2025-06-12","action":"Update","cartonMaterial":21136}}'
 
-
 		DROP TABLE IF EXISTS #skuList;
 
 		SELECT companyId, customerId, customerSkuId, invId, customerSku, merchantSku, ISNULL(EAN,'') as EAN, ISNULL(itemDesc,'') as itemDesc, 
-            currencyCode, CASE WHEN ISNULL(csCost,'') = '' THEN '0.0000' ELSE CAST(csCost AS NUMERIC(18,4)) END as csCost, tagDivision, 
-			CAST(feedStartDate as DATE) as feedStartDate, CAST(feedingEndDate as DATE) as feedingEndDate, actionType            
+            currencyCode, CASE WHEN ISNULL(csCost,'') = '' THEN '0.0000' ELSE CAST(csCost AS NUMERIC(18,4)) END as csCost, tagDivision, actionType            
 		INTO #skuList
 		FROM  OPENJSON(@Json, '$.customerSkuList') 
    			WITH (
@@ -72,16 +66,14 @@ SET XACT_ABORT ON
 				currencyCode VARCHAR(30)		N'$.currencyCode',
 				csCost VARCHAR(20)				N'$.csCost',
 				tagDivision INT		            N'$.division',
-				feedStartDate VARCHAR(10)		N'$.feedStartDate',
-				feedingEndDate VARCHAR(10)		N'$.feedingEndDate',              
 				actionType VARCHAR(10)			N'$.action'
 			)
 
 		DECLARE @companyId INT, @customerId INT, @customerSkuId BIGINT, @invId BIGINT, @customerSku VARCHAR(30), @merchantSku VARCHAR(30), @EAN VARCHAR(30), @itemDesc VARCHAR(5000),
-			@currencyCode VARCHAR(30), @csCost VARCHAR(20), @tagDivision INT, @feedStartDate DATE, @feedingEndDate DATE, @actionType VARCHAR(50);
+			@currencyCode VARCHAR(30), @csCost VARCHAR(20), @tagDivision INT, @actionType VARCHAR(50);
 
 		SELECT @companyId = companyId, @customerId = customerId, @customerSkuId = customerSkuId, @invId = invId, @customerSku = customerSku, @merchantSku = merchantSku, @EAN = EAN, @itemDesc = itemDesc,
-			@currencyCode = currencyCode, @csCost = csCost, @tagDivision = tagDivision, @feedStartDate = feedStartDate, @feedingEndDate = feedingEndDate, @actionType = actionType
+			@currencyCode = currencyCode, @csCost = csCost, @tagDivision = tagDivision, @actionType = actionType
 		FROM #skuList
 
 		-- check missing actionType
@@ -189,6 +181,13 @@ SET XACT_ABORT ON
 				SET @ErrMessage = '[System Error] Customer Sku ID ' + CAST(@customerSkuId as VARCHAR) + ' not found in the system.';
 				THROW 60000, @ErrMessage, 1;
 			END 
+
+			-- check customerSku status
+			IF (SELECT statusFlag FROM md_CustomerSku WHERE customerSkuId = @customerSkuId) = 0
+			BEGIN
+				SET @ErrMessage = 'No active Customer Sku records found in the system.';
+				THROW 60000, @ErrMessage, 1;				
+			END
 		END
 
 		IF @actionType = 'Update'
@@ -209,8 +208,6 @@ SET XACT_ABORT ON
                 THROW 60000, @ErrMessage, 1;
             END
 		END
-
-		
 
         BEGIN TRANSACTION
 
@@ -233,8 +230,6 @@ SET XACT_ABORT ON
                     EAN = @EAN,
                     itemDesc = @itemDesc,
                     csCost = @csCost,
-                    feedStartDate = ISNULL(@feedStartDate, feedStartDate),
-                    feedingEndDate = ISNULL(@feedingEndDate, feedingEndDate),
                     tagDivision = @tagDivision,
                     updateBy = @userId,
                     updateDateTime = GETDATE()
@@ -248,7 +243,7 @@ SET XACT_ABORT ON
                 INSERT INTO md_CustomerSku (customerId, companyId, invId, customerSku, merchantSku, EAN, itemDesc, currencyCode, csCost, statusFlag, tagDivision, 
                     feedStartDate, feedingEndDate, enterBy, createDateTime, updateBy, updateDateTime)
                 SELECT @customerId, @companyId, @invId, @customerSku, @merchantSku, @EAN, @itemDesc, @currencyCode, @csCost, 1 as statusFlag, @tagDivision, 
-                    ISNULL(@feedStartDate, GETDATE()), ISNULL(@feedingEndDate, GETDATE()), @userId, GETDATE(), @userId, GETDATE()
+                    GETDATE(), GETDATE(), @userId, GETDATE(), @userId, GETDATE()
 
                 SET @ErrMessage = 'added.'
             END
