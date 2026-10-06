@@ -1,10 +1,3 @@
-USE [EMS]
-GO
-
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
 -- =============================================
 -- Author:		ZY Wong
 -- Create date: 2026-09-10
@@ -17,11 +10,10 @@ GO
 -- =============================================
 /*
 select * from md_CustomerSkuPackagingMaterial where customerSkuId = 712 and packagingMaterialInvId = 5744
--- Add:		EXEC [SSP_CustomerSku_UpsertPackagingMaterial] N'{ "packagingMaterialList": {"companyId":"6","customerSkuId":"712","packagingMaterialInvId":"5744","packagingMaterialQty": "13.14","action": "Add"}}', 1
--- Update:	EXEC [SSP_CustomerSku_UpsertPackagingMaterial] N'{ "packagingMaterialList": {"companyId":"6","customerSkuPackagingMaterialId":"88","customerSkuId":"712","packagingMaterialInvId":"5744","packagingMaterialQty": "13.1415","action": "Update"}}', 1
+-- Add:		EXEC [SSP_CustomerSku_UpsertPackagingMaterial] N'{ "packagingMaterialList": {"companyId":"6","customerSkuId":"712","productQty":"1","packagingMaterialInvId":"5744","packagingMaterialQty": "13.14","action": "Add"}}', 1
+-- Update:	EXEC [SSP_CustomerSku_UpsertPackagingMaterial] N'{ "packagingMaterialList": {"companyId":"6","customerSkuPackagingMaterialId":"88","customerSkuId":"712","productQty":"1","packagingMaterialInvId":"5744","packagingMaterialQty": "13.1415","action": "Update"}}', 1
 -- Delete:	EXEC [SSP_CustomerSku_UpsertPackagingMaterial] N'{ "packagingMaterialList": {"companyId":"6","customerSkuPackagingMaterialId":"88","action": "Delete"}}', 1
 */
-
 CREATE PROCEDURE [dbo].[SSP_CustomerSku_UpsertPackagingMaterial]
 @Json NVARCHAR(MAX),
 @userId INT 
@@ -36,22 +28,23 @@ SET XACT_ABORT ON;
 
 		DROP TABLE IF EXISTS #packaging;
 
-		SELECT companyId, customerSkuPackagingMaterialId, customerSkuId, packagingMaterialInvId, CONVERT(NUMERIC(18,4), packagingMaterialQty) as packagingMaterialQty, actionType            
+		SELECT companyId, customerSkuPackagingMaterialId, customerSkuId, productQty, packagingMaterialInvId, CONVERT(NUMERIC(18,4), packagingMaterialQty) as packagingMaterialQty, actionType            
 		INTO #packaging
 		FROM  OPENJSON(@Json, '$.packagingMaterialList') 
    			WITH (
                 companyId INT							N'$.companyId',
 				customerSkuPackagingMaterialId BIGINT	N'$.customerSkuPackagingMaterialId',
 				customerSkuId BIGINT					N'$.customerSkuId',
+				productQty INT							N'$.productQty',
 				packagingMaterialInvId BIGINT			N'$.packagingMaterialInvId',
 				packagingMaterialQty VARCHAR(20)		N'$.packagingMaterialQty',
 				actionType VARCHAR(10)					N'$.action'
 			)
 
-		DECLARE @companyId INT, @customerSkuPackagingMaterialId BIGINT, @customerSkuId BIGINT, @packagingMaterialInvId BIGINT, @packagingMaterialQty NUMERIC(18,4), @actionType VARCHAR(10);
+		DECLARE @companyId INT, @customerSkuPackagingMaterialId BIGINT, @customerSkuId BIGINT, @productQty INT, @packagingMaterialInvId BIGINT, @packagingMaterialQty NUMERIC(18,4), @actionType VARCHAR(10);
 		DECLARE @oriPackagingMaterialInvId BIGINT, @packagingMaterial VARCHAR(255), @customerSku VARCHAR(30);
 
-		SELECT @companyId = companyId, @customerSkuPackagingMaterialId = customerSkuPackagingMaterialId, @customerSkuId = customerSkuId, 
+		SELECT @companyId = companyId, @customerSkuPackagingMaterialId = customerSkuPackagingMaterialId, @customerSkuId = customerSkuId, @productQty = productQty,
 			@packagingMaterialInvId = packagingMaterialInvId, @packagingMaterialQty = packagingMaterialQty, @actionType = actionType
 		FROM #packaging
 
@@ -85,6 +78,12 @@ SET XACT_ABORT ON;
 
         IF @actionType IN ('Add', 'Update')
         BEGIN
+			-- check missing productQty
+			IF ISNULL(@productQty, 0) = 0
+			BEGIN
+				SET @ErrMessage = '[System Error] Product Qty is required.';
+				THROW 60000, @ErrMessage, 1;
+			END
 
 			-- check missing packagingMaterialQty
 			IF ISNULL(@packagingMaterialQty, '0.0000') = '0.0000'
@@ -172,7 +171,8 @@ SET XACT_ABORT ON;
 
             IF @actionType = 'Update'
             BEGIN
-                UPDATE md_CustomerSkuPackagingMaterial SET                     
+                UPDATE md_CustomerSkuPackagingMaterial SET
+					productQty = @productQty,
                     unitsPerPackagingMaterial = @packagingMaterialQty,
                     updateBy = @userId,
                     updateDateTime = GETDATE()
@@ -185,12 +185,13 @@ SET XACT_ABORT ON;
             BEGIN
 				IF @oriPackagingMaterialInvId IS NULL
 				BEGIN
-					INSERT INTO md_CustomerSkuPackagingMaterial (customerSkuId, packagingMaterialInvId, unitsPerPackagingMaterial, statusFlag, enterBy, createDateTime, updateBy, updateDateTime)
-					SELECT @customerSkuId, @packagingMaterialInvId, @packagingMaterialQty, 1 as statusFlag, @userId, GETDATE(), @userId, GETDATE()
+					INSERT INTO md_CustomerSkuPackagingMaterial (customerSkuId, productQty, packagingMaterialInvId, unitsPerPackagingMaterial, statusFlag, enterBy, createDateTime, updateBy, updateDateTime)
+					SELECT @customerSkuId, @productQty, @packagingMaterialInvId, @packagingMaterialQty, 1 as statusFlag, @userId, GETDATE(), @userId, GETDATE()
 				END
 				ELSE
 				BEGIN
-					UPDATE md_CustomerSkuPackagingMaterial SET                     
+					UPDATE md_CustomerSkuPackagingMaterial SET
+						productQty = @productQty,
 						unitsPerPackagingMaterial = @packagingMaterialQty,
 						statusFlag = 1,
 						updateBy = @userId,
