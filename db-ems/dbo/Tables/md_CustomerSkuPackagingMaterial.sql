@@ -2,8 +2,9 @@ CREATE TABLE [dbo].[md_CustomerSkuPackagingMaterial]
 (
     [customerSkuPackagingMaterialId] BIGINT IDENTITY (1, 1) NOT NULL,
     [customerSkuId]                  INT             NOT NULL,
+    [productQty]                     INT             NOT NULL,
     [packagingMaterialInvId]         BIGINT          NOT NULL,
-    [unitsPerPackagingMaterial]      NUMERIC(13,4) NOT NULL,
+    [unitsPerPackagingMaterial]      NUMERIC(13,4)   NOT NULL,
     [statusFlag]                     INT
         CONSTRAINT [DF_md_CustomerSkuPackagingMaterial_statusFlag]
         DEFAULT ((1)) NOT NULL,
@@ -33,6 +34,9 @@ CREATE TABLE [dbo].[md_CustomerSkuPackagingMaterial]
 
     CONSTRAINT [CK_CustomerSkuPackagingMaterial_Quantity]
         CHECK ([unitsPerPackagingMaterial] > 0),
+
+    CONSTRAINT [CK_CustomerSkuPackagingMaterial_ProductQuantity]
+        CHECK ([productQty] > 0),
 
     CONSTRAINT [CK_CustomerSkuPackagingMaterial_Status]
         CHECK ([statusFlag] IN (0, 1))
