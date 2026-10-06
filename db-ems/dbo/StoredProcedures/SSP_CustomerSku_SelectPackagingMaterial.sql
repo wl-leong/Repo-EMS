@@ -21,7 +21,7 @@ SET XACT_ABORT ON;
 
 		DROP TABLE IF EXISTS #packaging;
 
-		SELECT customerSkuPackagingMaterialId, customerSkuId, packagingMaterialInvId, unitsPerpackagingMaterial
+		SELECT customerSkuPackagingMaterialId, customerSkuId, productQty, packagingMaterialInvId, unitsPerpackagingMaterial
 		INTO #packaging
 		FROM md_CustomerSkuPackagingMaterial
 		WHERE customerSkuId = @customerSkuId
@@ -37,7 +37,7 @@ SET XACT_ABORT ON;
 		WHERE inv.companyId = @companyId
 			AND inv.status = 1
 
-		SELECT customerSkuPackagingMaterialId, customerSkuId, packagingMaterialInvId, packagingMaterial, unitsPerpackagingMaterial
+		SELECT customerSkuPackagingMaterialId, customerSkuId, productQty, packagingMaterialInvId, packagingMaterial, unitsPerpackagingMaterial
 		FROM #packaging
 		ORDER BY packagingMaterial
 
