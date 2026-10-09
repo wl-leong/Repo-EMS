@@ -1,9 +1,3 @@
-
---1105	Open
---1106	Confirm
---1107	Cancel
---1108	Close
-
 -- =============================================
 -- Author:		WL Leong
 -- Create date: 2023-08-28
@@ -13,6 +7,7 @@
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-10-09	14.0		ZY Wong		Update existed soHeader.earlyShipDate & lateShipDate & shipToId, duplicate changes ver 8.0 for existed so
 -- 2025-09-17	13.0        WL Leong	Fix soHeaderId for add line itemId
 -- 2025-09-12   12.0        WL Leong	Raise a already exists PO, will only insert the diff soLineItem
 -- 2025-05-06   11.0        ZY Wong     Pass merchantSku & itemReference2(EAN) into soLineItem 
@@ -42,7 +37,7 @@ BEGIN
 	    BEGIN TRY
 			DECLARE @returnMessage VARCHAR(MAX);
 			DECLARE @result TABLE (poRefName VARCHAR(20), poQty INT);
-            DELETE FROM @result
+            DELETE FROM @result;
 
 
 			--DECLARE @Json varchar(MAX) = N'{"poList":[{"poId":"7"}]}'
@@ -290,6 +285,16 @@ BEGIN
 				END
 				ELSE
 				BEGIN
+					-- reopen po -> update existed SO
+					UPDATE soHeader SET
+						earlyShipDate = po.poEarlyShipDate, 
+						lateShipDate = po.poLateShipDate,
+						shipToId = ISNULL(@shipToId, so.shipToId)
+					FROM soHeader so
+						INNER JOIN (SELECT poName, poEarlyShipDate, poLateShipDate FROM #customerPOList WHERE poId = @poId) po
+							ON so.customerPo = po.poName
+					WHERE so.soHeaderId = @supplierSoHeaderId
+
 					UPDATE supplierli SET
 						odrQty = li.ttlQty,
 						updateDate = getdate(),
@@ -301,15 +306,28 @@ BEGIN
  
 					INSERT INTO soLineItem(soHeaderId, ref_poLineItemId, invId, customerSkuId, customerSku, csCost, currencyCode, odrQty, 
 						itemReference1, soLineItemStatus, createBy, createDate)
-					SELECT @supplierSoHeaderId, poDetailsId, p.invId, p.customerSkuId, supplierSku, unitPrice, p.currencyCode, SUM(qty), 
-						p.itemReference1, 1105, @updateBy, getdate()
+					SELECT @supplierSoHeaderId, p.poDetailsId, p.invId, p.customerSkuId, p.supplierSku, p.unitPrice, p.currencyCode, SUM(p.qty), 
+						p.itemReference1, CASE WHEN p.tagDivision = 3234 THEN 1105 ELSE 1106 END as soLineItemStatus, @updateBy, getdate()
 					FROM #soLineItem p
 						LEFT JOIN soLineItem supplierli
 							ON p.poDetailsId = supplierli.ref_poLineItemId
 					WHERE poId = @poId
 						AND supplierli.soLineItemId IS NULL
-					GROUP BY poDetailsId, p.invId, p.customerSkuId, supplierSku, unitPrice, p.currencyCode, unitPrice, 
-						p.itemReference1
+					GROUP BY p.poDetailsId, p.invId, p.customerSkuId, p.supplierSku, p.unitPrice, p.currencyCode, p.unitPrice, 
+						p.itemReference1, p.tagDivision
+
+					IF (SELECT COUNT(1) FROM soLineItem WHERE soLineItemStatus = 1105 AND soHeaderId = @soHeaderId) = 0
+					BEGIN
+						UPDATE soLineItem SET
+							soLineItemStatus = 1106
+						WHERE soHeaderId = @supplierSoHeaderId
+
+						UPDATE soHeader SET
+							soStatus = 1106,
+							apiStatus = '_NEW_',
+							soName = REPLACE(soName, 'tempSO_', '')
+						WHERE soHeaderId = @supplierSoHeaderId
+					END
 				END
 			
 			    UPDATE poHeader SET
@@ -320,7 +338,7 @@ BEGIN
 				    itemStatus = 1077
 			    WHERE poId = @poId
 
-			    DELETE FROM @NewOrder
+			    DELETE FROM @NewOrder;
 			
 			    INSERT INTO @result(poRefName, poQty)
 			    SELECT poName, SUM(qty)
@@ -367,4 +385,3 @@ BEGIN
 END
 
 GO
-
