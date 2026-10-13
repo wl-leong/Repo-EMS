@@ -20,7 +20,6 @@ CREATE TABLE [dbo].[temp_inventoryLog] (
     [cbm]                NVARCHAR (50)   NULL,
     [measurement]        NVARCHAR (20)   NULL,
     [color]              NVARCHAR (255)  NULL,
-    [packaging]          NVARCHAR (255)  NULL,
     [size]               NVARCHAR (255)  NULL,
     [glCode]             NVARCHAR (50)   NULL,
     [virtualProduct]     NVARCHAR (1)    NULL,
