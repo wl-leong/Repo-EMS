@@ -23,6 +23,7 @@ SET NOCOUNT ON;
 SET XACT_ABORT ON;
 
     /** sortBy
+		1 = order by customerName
         2 = order by productSku
         3 = order by productName 
         4 = order by itemDescription 
