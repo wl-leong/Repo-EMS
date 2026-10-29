@@ -1,12 +1,13 @@
 -- =============================================
 -- Author:		WL Leong
 -- Create date: 2024-05-05
--- Used By:	    EMS -> SO Module -> SO Listing -> Export SO/PI ssrs
+-- Used By:	    EMS -> SO Module -> SO Listing -> SO PDF/ PI PDF
 --
--- Description : 
+-- Description : Show list of sales order item based on soHeaderId
 --
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-09-08	9.0			ZY Wong		Get packaging from md_CustomerSkuPackagingMaterial
 -- 2025-09-24   8.0         ZY Wong     Add @userId & @companyId & @menu2Id to control cost permission
 -- 2024-05-06   7.0         ZY Wong     Use itemReference2 as EAN
 -- 2024-11-18   6.0         ZY Wong     Change get color from inventory_attributes where categoryId in (19, 3194)
@@ -16,7 +17,7 @@
 -- 2024-06-13   2.0         ZY Wong     Filter out cancel item
 -- 2024-05-05	1.0			WL Leong	Initial
 -- ==========================================================================================
--- EXEC SSP_SalesOrder_SSRS_SelectLineItem 20817, 'PI'
+-- EXEC [SSP_SalesOrder_SSRS_SelectLineItem] 20817, 'SO', 1, 11, 3059
 CREATE PROCEDURE [dbo].[SSP_SalesOrder_SSRS_SelectLineItem]
 @soHeaderId BIGINT,
 @module VARCHAR(2),
@@ -24,7 +25,6 @@ CREATE PROCEDURE [dbo].[SSP_SalesOrder_SSRS_SelectLineItem]
 @companyId INT,
 @menu2Id INT
 AS 
-
 BEGIN
 	SET NOCOUNT ON;
 	SET XACT_ABORT ON;
@@ -52,6 +52,7 @@ BEGIN
             --AND odrQty > 0
     
         ALTER TABLE #soLineItem ADD color VARCHAR(50);
+		ALTER TABLE #soLineItem ADD packagingMaterialInvId BIGINT;
         ALTER TABLE #soLineItem ADD packagingType VARCHAR(50);
         ALTER TABLE #soLineItem ADD modelNo VARCHAR(50);
         ALTER TABLE #soLineItem ADD itemCode VARCHAR(50);
@@ -74,16 +75,21 @@ BEGIN
         FROM md_inventory inv
         WHERE #soLineItem.invId = inv.invId
  
-        UPDATE #soLineItem 
-            SET color = cl.value
-        FROM (SELECT invId, value FROM inventory_attributes WHERE categoryId IN (3194)) cl
-        WHERE #soLineItem.invId = cl.invId
-         
-        UPDATE #soLineItem 
-            SET packagingType = cl.value
+        UPDATE #soLineItem SET 
+            color = cl.value
         FROM inventory_attributes cl
         WHERE #soLineItem.invId = cl.invId
-                AND cl.categoryId = 1123 -- packagingType
+                AND cl.categoryId = 3194 -- color
+         
+        UPDATE #soLineItem SET 
+            packagingMaterialInvId = pm.packagingMaterialInvId
+        FROM md_CustomerSkuPackagingMaterial pm
+        WHERE #soLineItem.customerSkuId = pm.customerSkuId
+
+		UPDATE #soLineItem SET 
+            packagingType = inv.productName
+        FROM md_Inventory inv
+        WHERE #soLineItem.packagingMaterialInvId = inv.invId
  
         UPDATE #soLineItem SET
             HTSCode = c.HTSCode
@@ -102,4 +108,3 @@ BEGIN
 END
 
 GO
-
