@@ -6,10 +6,11 @@
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-09-08	2.0			ZY Wong		Get packaging from md_CustomerSkuPackagingMaterial
 -- 2026-08-18	1.1			ZY Wong		Remove parameter @customerId, allow @workOrderStartDate and @workOrderEndDate pass in null
 -- 2026-08-14	1.0			ZY Wong 	Initial version
 -- ==========================================================================================
--- EXEC [SSP_WorkOrder_SSRS_SelectWorkOrderListing] 4, '5231,5236', '2025-03-01', '2025-03-31'
+-- EXEC [SSP_WorkOrder_SSRS_SelectWorkOrderListing] 4, '5231,5236', '2024-03-01', '2026-03-31'
 -- EXEC [SSP_WorkOrder_SSRS_SelectWorkOrderListing] 4, '5230', '2025-06-01', '2025-08-31'
 CREATE PROCEDURE [dbo].[SSP_WorkOrder_SSRS_SelectWorkOrderListing]
 @companyId INT = 4,
@@ -116,26 +117,34 @@ SET XACT_ABORT ON;
 
 		DROP TABLE IF EXISTS #poItems;
 
-		SELECT soli.soLineItemId, poli.poDetailsId, poli.invId
+		SELECT soli.soLineItemId, poli.poDetailsId, poli.invId, mktli.customerSkuId
 		INTO #poItems
 		FROM poLineItem poli
 			INNER JOIN soLineItem soli
 				ON poli.poDetailsId = soli.ref_poLineItemId
 			INNER JOIN #woItems li
 				ON soli.soLineItemId = li.soLineItemId
+			INNER JOIN soLineItem mktli
+				ON poli.soLineItemId = mktli.soLineItemId
 
+		ALTER TABLE #poItems ADD packagingMaterialInvId BIGINT;
 		ALTER TABLE #poItems ADD packaging VARCHAR(255);
 
 		UPDATE #poItems SET
-			packaging = att.[value]
-		FROM inventory_attributes att
-		WHERE #poItems.invId = att.invId
-			AND att.categoryId = 1123 -- packaging
+			packagingMaterialInvId = pm.packagingMaterialInvId
+		FROM md_CustomerSkuPackagingMaterial pm
+		WHERE #poItems.customerSkuId = pm.customerSkuId
+
+		UPDATE #poItems SET
+			packaging = inv.productName
+		FROM md_Inventory inv
+		WHERE #poItems.packagingMaterialInvId = inv.invId
+			AND #poItems.packagingMaterialInvId IS NOT NULL
 
 		ALTER TABLE #woItems ADD packaging VARCHAR(255);
 
 		UPDATE #woItems SET
-			packaging = li.packaging
+			packaging = ISNULL(li.packaging,'')
 		FROM #poItems li
 		WHERE #woItems.soLineItemId = li.soLineItemId
 
