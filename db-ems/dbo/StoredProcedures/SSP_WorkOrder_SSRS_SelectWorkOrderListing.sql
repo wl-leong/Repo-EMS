@@ -6,6 +6,7 @@
 
 -- History: * Put the latest change on the top
 -- DATE			VERSION #	NAME		DESCRIPTION
+-- 2026-10-30	3.0			ZY Wong		Congigured factory customerId in md_CustomerSkuPackagingMaterial
 -- 2026-09-08	2.0			ZY Wong		Get packaging from md_CustomerSkuPackagingMaterial
 -- 2026-08-18	1.1			ZY Wong		Remove parameter @customerId, allow @workOrderStartDate and @workOrderEndDate pass in null
 -- 2026-08-14	1.0			ZY Wong 	Initial version
@@ -67,7 +68,7 @@ SET XACT_ABORT ON;
 
 		SELECT wo.workOrderHeaderId, woli.workOrderLineItemId, woli.soHeaderId, woli.soName, woli.soLineItemId, 
 			woli.invId, woli.confirmQty, woli.workOrderItemStatus as workOrderItemStatusId,
-			soli.customerSku, soli.merchantSku, soli.itemReference1 as customerModelNo, soli.itemReference2 as EAN, soli.soItemDesc as itemDesc
+			soli.customerSkuId, soli.customerSku, soli.merchantSku, soli.itemReference1 as customerModelNo, soli.itemReference2 as EAN, soli.soItemDesc as itemDesc
 		INTO #woItems
 		FROM workOrderLineItem woli
 			INNER JOIN #woList wo
@@ -82,6 +83,8 @@ SET XACT_ABORT ON;
 		ALTER TABLE #woItems ADD POD VARCHAR(50);
 		ALTER TABLE #woItems ADD color VARCHAR(50);
 		ALTER TABLE #woItems ADD workOrderItemStatus VARCHAR(50);
+		ALTER TABLE #woItems ADD packagingMaterialInvId BIGINT;
+		ALTER TABLE #woItems ADD packaging VARCHAR(255);
 
 		UPDATE #woItems SET
 			modelNo = inv.inventorySku
@@ -115,38 +118,15 @@ SET XACT_ABORT ON;
 		WHERE #woItems.workOrderItemStatusId = ct.categoryId 
 			--AND ct.[status] = 1
 
-		DROP TABLE IF EXISTS #poItems;
-
-		SELECT soli.soLineItemId, poli.poDetailsId, poli.invId, mktli.customerSkuId
-		INTO #poItems
-		FROM poLineItem poli
-			INNER JOIN soLineItem soli
-				ON poli.poDetailsId = soli.ref_poLineItemId
-			INNER JOIN #woItems li
-				ON soli.soLineItemId = li.soLineItemId
-			INNER JOIN soLineItem mktli
-				ON poli.soLineItemId = mktli.soLineItemId
-
-		ALTER TABLE #poItems ADD packagingMaterialInvId BIGINT;
-		ALTER TABLE #poItems ADD packaging VARCHAR(255);
-
-		UPDATE #poItems SET
+		UPDATE #woItems SET
 			packagingMaterialInvId = pm.packagingMaterialInvId
 		FROM md_CustomerSkuPackagingMaterial pm
-		WHERE #poItems.customerSkuId = pm.customerSkuId
-
-		UPDATE #poItems SET
-			packaging = inv.productName
-		FROM md_Inventory inv
-		WHERE #poItems.packagingMaterialInvId = inv.invId
-			AND #poItems.packagingMaterialInvId IS NOT NULL
-
-		ALTER TABLE #woItems ADD packaging VARCHAR(255);
+		WHERE #woItems.customerSkuId = pm.customerSkuId
 
 		UPDATE #woItems SET
-			packaging = ISNULL(li.packaging,'')
-		FROM #poItems li
-		WHERE #woItems.soLineItemId = li.soLineItemId
+			packaging = inv.productName
+		FROM md_Inventory inv
+		WHERE #woItems.packagingMaterialInvId = inv.invId
 
 		SELECT wo.workOrderName, wo.workOrderDate, wo.cargoReadyDate, wo.deliveryDate, wo.targetCompleteDate, wo.customerName, wo.warehouse, wo.workOrderStatus,
 			li.soName, li.customerPo, li.POD, li.thirdPartyPo, li.modelNo, li.customerSku, li.EAN, li.customerModelNo, li.merchantSku, li.itemDesc, li.color, li.packaging, li.confirmQty, li.workOrderItemStatus
